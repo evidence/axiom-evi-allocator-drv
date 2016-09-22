@@ -371,8 +371,8 @@ struct mem_config *mem_manager_create(const char *s, struct resource *r)
 	memory = _find_mem_by_name(s);
 	if (memory != NULL) {
 		mutex_unlock(&manager_mutex);
-		pr_info("Already allocated memory\n");
-		return memory;
+		pr_info("Memory already registered\n");
+		return NULL;
 	}
 
 	memory = (struct mem_config *)kmalloc(sizeof(*memory), GFP_KERNEL);
