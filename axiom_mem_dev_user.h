@@ -10,17 +10,15 @@ struct axiom_mem_dev_info {
 #define AXIOM_MEM_DEV_GET_MEM_INFO _IOR(AXIOM_MEM_DEV_MAGIC, 100,\
 					struct axiom_mem_dev_info [1])
 
-#define AXIOM_MEM_DEV_PRIVATE_ALLOC _IOR(AXIOM_MEM_DEV_MAGIC, 101,\
-					 struct axiom_mem_dev_info [1])
-
-#define AXIOM_MEM_DEV_GET_PRIVATE_MEM_INFO _IOR(AXIOM_MEM_DEV_MAGIC, 102,\
-						struct axiom_mem_dev_info [1])
-
-#define AXIOM_MEM_DEV_SHARED_ALLOC _IOR(AXIOM_MEM_DEV_MAGIC, 103,\
-					struct axiom_mem_dev_info [1])
-
 #define AXIOM_MEM_DEV_CONFIG_VMEM _IOWR(AXIOM_MEM_DEV_MAGIC, 103,\
 					struct axiom_mem_dev_info [1])
 
+#define AXIOM_MEM_DEV_RESERVE_MEM _IOWR(AXIOM_MEM_DEV_MAGIC, 104,\
+					struct axiom_mem_dev_info [1])
+
 #define AXIOM_MEM_DEV_SET_APP_ID  _IOWR(AXIOM_MEM_DEV_MAGIC, 105, int)
+
+#define AXIOM_MEM_DEV_REVOKE_MEM  _IOWR(AXIOM_MEM_DEV_MAGIC, 106,\
+					struct axiom_mem_dev_info [1])
+
 #endif /* AXIOM_MEM_DEV_USER_H */

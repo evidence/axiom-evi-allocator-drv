@@ -37,6 +37,8 @@
 #include <linux/mman.h>
 
 #include <linux/ioctl.h>
+
+#include "axiom_mem_manager.h"
 #include "axiom_mem_dev_user.h"
 #include "axiom_mem_dev_lib.h"
 
@@ -56,8 +58,7 @@ static struct axiom_mem_dev_struct {
 	struct cdev c_dev; /* character device structure */
 	struct device *dev; /* TODO: remove this field */
 	dev_t devt;
-	struct mem_config memory;
-	int datum;
+	struct mem_config *memory;
 } axiom_mem_dev[MAX_DEVICES_NUMBER];
 
 struct fpriv_data_s {
@@ -69,38 +70,34 @@ struct fpriv_data_s {
 static unsigned long gaddr;
 void *io_map;
 
+void dump_dev_list(struct axiom_mem_dev_struct *adev)
+{
+	struct device *dev = adev->dev;
+	struct list_elem_s *list;
+
+	list = &(adev->memory->alloc_list);
+	dev_info(dev, "alloc list:\n");
+	dump_list(list);
+
+	list = &(adev->memory->free_list);
+	dev_info(dev, "free list:\n");
+	dump_list(list);
+}
+
 static void dump_mem(struct axiom_mem_dev_struct *adev)
 {
 	struct device *dev = adev->dev;
 
 	dev_info(dev, "Phy mem\n");
-	dev_info(dev, "start   : 0x%llx\n", adev->memory.base);
-	dev_info(dev, "size    : %zu\n", adev->memory.size);
-
-	dev_info(dev, "Private mem\n");
-	dev_info(dev, "start   : 0x%llx\n", adev->memory.priv_mem.start);
-	dev_info(dev, "end     : 0x%llx\n", adev->memory.priv_mem.end);
-	dev_info(dev, "size    : %zu\n", adev->memory.priv_mem.size);
+	dev_info(dev, "start   : 0x%llx\n", adev->memory->base);
+	dev_info(dev, "size    : %zu\n", adev->memory->size);
 
 	dev_info(dev, "Shared mem\n");
-	dev_info(dev, "start   : 0x%llx\n", adev->memory.shared_mem.start);
-	dev_info(dev, "end     : 0x%llx\n", adev->memory.shared_mem.end);
-	dev_info(dev, "size    : %zu\n", adev->memory.shared_mem.size);
+	dev_info(dev, "start   : 0x%llx\n", adev->memory->shared_mem.start);
+	dev_info(dev, "end     : 0x%llx\n", adev->memory->shared_mem.end);
+	dev_info(dev, "size    : %zu\n", adev->memory->shared_mem.size);
 }
 
-static void axiom_mem_dev_reset_mem(struct mem_config *memory)
-{
-	pr_info("%s]\n", __func__);
-
-	memory->priv_mem.start = memory->base;
-	memory->priv_mem.end = memory->base;
-	memory->priv_mem.size = 0;
-
-	memory->shared_mem.start = memory->shared_mem.end =
-							    memory->base
-							    + memory->size;
-	memory->shared_mem.size = 0;
-}
 
 /**/
 #if 0
@@ -121,8 +118,8 @@ static int force_mmap(struct file *file, struct vm_area_struct *vma)
 	/* vma->vm_pgoff = (0x70000000 >> PAGE_SHIFT); */
 	pr_info("2) pg_off = %lx\n", vma->vm_pgoff);
 
-	if (size > dev->memory.size) {
-		pr_err("%zu > max size (%zu)\n", size, dev->memory.size);
+	if (size > dev->memory->size) {
+		pr_err("%zu > max size (%zu)\n", size, dev->memory->size);
 		return -EAGAIN;
 	}
 
@@ -145,7 +142,7 @@ static int force_mmap(struct file *file, struct vm_area_struct *vma)
 	else
 		pr_info("OK for shared MAP\n");
 
-	phy_pfn = dev->memory.base >> PAGE_SHIFT;
+	phy_pfn = dev->memory->base >> PAGE_SHIFT;
 
 	err = remap_pfn_range(vma, vma->vm_start, phy_pfn, size,
 			      vma->vm_page_prot);
@@ -289,9 +286,17 @@ static int axiom_mem_dev_close(struct inode *i, struct file *f)
 {
 	struct fpriv_data_s *pdata = f->private_data;
 	struct axiom_mem_dev_struct *dev = pdata->dev;
+	struct list_elem_s remove;
 
 	pr_info("Driver: close()\n");
-	axiom_mem_dev_reset_mem(&dev->memory);
+
+	remove.tag = pdata->axiom_app_id;
+	remove.start = 0;
+	remove.end = LONG_MAX;
+	free_space(dev->memory, &remove);
+	dump_dev_list(dev);
+
+	axiom_mem_dev_reset_mem(dev->memory);
 	dump_mem(dev);
 
 	kfree(pdata);
@@ -345,21 +350,18 @@ static void print_phys(struct mm_struct *mm)
 static ssize_t axiom_mem_dev_read(struct file *f, char __user *buf, size_t len,
 				  loff_t *off)
 {
-	struct fpriv_data_s *pdata = f->private_data;
-	struct axiom_mem_dev_struct *dev = pdata->dev;
+	/* struct fpriv_data_s *pdata = f->private_data;
+	struct axiom_mem_dev_struct *dev = pdata->dev; */
 
 	pr_info("Driver: read()\n");
-	pr_info("datum = %d\n", dev->datum);
 
 	print_phys(current->mm);
 
 	return -ENOSYS;
-
-	return 0;
 }
 
 static ssize_t axiom_mem_dev_write(struct file *f, const char __user *buf,
-			size_t len, loff_t *off)
+				   size_t len, loff_t *off)
 {
 	pr_info("Driver: write()\n");
 
@@ -380,44 +382,11 @@ static long axiom_mem_dev_ioctl(struct file *f, unsigned int cmd,
 	case AXIOM_MEM_DEV_GET_MEM_INFO: {
 		struct axiom_mem_dev_info tmp;
 
-		tmp.base = dev->memory.base;
-		tmp.size = dev->memory.size;
+		tmp.base = dev->memory->base;
+		tmp.size = dev->memory->size;
 		err = copy_to_user((void __user *)arg, &tmp, sizeof(tmp));
 		if (err < 0)
 			return -EFAULT;
-		break;
-	}
-	case AXIOM_MEM_DEV_GET_PRIVATE_MEM_INFO: {
-		struct axiom_mem_dev_info tmp;
-
-		tmp.base = dev->memory.priv_mem.start;
-		tmp.size = dev->memory.priv_mem.size;
-		err = copy_to_user((void __user *)arg, &tmp, sizeof(tmp));
-		if (err < 0)
-			return -EFAULT;
-		break;
-	}
-	case AXIOM_MEM_DEV_PRIVATE_ALLOC: {
-		struct axiom_mem_dev_info tmp;
-
-		err = copy_from_user(&tmp, (void __user *)arg, sizeof(tmp));
-		if (err)
-			return -EFAULT;
-
-		err = reserve_private(&tmp, &dev->memory.priv_mem,
-				       &dev->memory.shared_mem);
-		if (err)
-			return err;
-
-		/* compute offset */
-		tmp.base -= dev->memory.base;
-
-		err = copy_to_user((void __user *)arg, &tmp, sizeof(tmp));
-		if (err < 0)
-			return -EFAULT;
-
-		dump_mem(dev);
-
 		break;
 	}
 	case AXIOM_MEM_DEV_CONFIG_VMEM: {
@@ -427,13 +396,57 @@ static long axiom_mem_dev_ioctl(struct file *f, unsigned int cmd,
 		if (err)
 			return -EFAULT;
 
-		err = setup_user_vaddr(&tmp, &dev->memory.virt_mem,
-				       dev->memory.size);
+		err = setup_user_vaddr(&tmp, dev->memory);
 		/*TODO: error from ioctl or from returned structure? */
 
 		err = copy_to_user((void __user *)arg, &tmp, sizeof(tmp));
 		if (err < 0)
 			return -EFAULT;
+		break;
+	}
+	case AXIOM_MEM_DEV_RESERVE_MEM: {
+		struct axiom_mem_dev_info tmp;
+
+		err = copy_from_user(&tmp, (void __user *)arg, sizeof(tmp));
+		if (err)
+			return -EFAULT;
+
+		pr_info("%s] allocate_space for <%ld,%ld> (sz=%ld)\n", __func__,
+			tmp.base, tmp.base + tmp.size, tmp.size);
+		tmp.base = axiom_v2p(dev->memory, tmp.base);
+		pr_info("%s] PHY allocate_space for <%ld,%ld> (sz=%ld)\n", __func__,
+			tmp.base, tmp.base + tmp.size, tmp.size);
+		err = allocate_space(dev->memory,
+				     pdata->axiom_app_id, tmp.base,
+				     tmp.base + tmp.size);
+		if (err)
+			return err;
+
+		dump_dev_list(dev);
+
+		break;
+	}
+	case AXIOM_MEM_DEV_REVOKE_MEM: {
+		struct axiom_mem_dev_info tmp;
+		struct list_elem_s rem;
+
+		err = copy_from_user(&tmp, (void __user *)arg, sizeof(tmp));
+		if (err)
+			return -EFAULT;
+
+		rem.tag = pdata->axiom_app_id;
+		rem.start = axiom_v2p(dev->memory, tmp.base);
+		rem.end = rem.start + tmp.size;
+
+		pr_info("%s] free_space for <%ld,%ld> (sz=%ld)\n", __func__,
+			rem.start, rem.end, tmp.size);
+
+		err = free_space(dev->memory, &rem);
+		if (err)
+			return err;
+
+		dump_dev_list(dev);
+
 		break;
 	}
 	case AXIOM_MEM_DEV_SET_APP_ID: {
@@ -488,8 +501,8 @@ static int axiom_mem_dev_mmap(struct file *file, struct vm_area_struct *vma)
 		return -EAGAIN;
 	}
 #endif
-	if (size > dev->memory.size) {
-		pr_err("%zu > max size (%zu)\n", size, dev->memory.size);
+	if (size > dev->memory->size) {
+		pr_err("%zu > max size (%zu)\n", size, dev->memory->size);
 		return -EAGAIN;
 	}
 
@@ -515,7 +528,7 @@ static int axiom_mem_dev_mmap(struct file *file, struct vm_area_struct *vma)
 	else
 		pr_info("OK for shared MAP\n");
 
-	phy_pfn = dev->memory.base >> PAGE_SHIFT;
+	phy_pfn = dev->memory->base >> PAGE_SHIFT;
 #if 0
 	if (remap_pfn_range(vma, vma->vm_start,
 			    /*vma->vm_pgoff*/ (0x70000000 >> PAGE_SHIFT)
@@ -650,22 +663,6 @@ static const struct file_operations pugs_fops = {
 dma_addr_t dma_handle;
 void *buffer_addr;
 
-
-static void axiom_mem_dev_init_mem(struct mem_config *memory,
-				   struct resource *r)
-{
-	pr_info("%s]\n", __func__);
-
-	memory->base = (u64)r->start;
-	memory->size = resource_size(r);
-
-	memory->virt_mem.start = memory->virt_mem.end = 0;
-	memory->virt_mem.size = 0;
-
-	axiom_mem_dev_reset_mem(memory);
-
-}
-
 static int axiom_mem_dev_probe(struct platform_device *pdev)
 {
 	struct device_node *np = pdev->dev.of_node;
@@ -689,12 +686,15 @@ static int axiom_mem_dev_probe(struct platform_device *pdev)
 	if (!np) {
 		dev_err(dev, "No memory-region specified\n");
 		return -EINVAL;
+	} else {
+		dev_info(dev, "of_node_full_name = %s\n", of_node_full_name(np));
 	}
 
 	ret = of_address_to_resource(np, 0, &r);
-	of_node_put(np);
-	if (ret)
+	if (ret) {
+		of_node_put(np);
 		return ret;
+	}
 
 	mutex_lock(&manager_mutex);
 	if (dev_num_instance > MAX_DEVICES_NUMBER) {
@@ -732,39 +732,47 @@ static int axiom_mem_dev_probe(struct platform_device *pdev)
 	dev_set_drvdata(axiom_mem_dev[ni].dev, (void *)&(axiom_mem_dev[ni]));
 	platform_set_drvdata(pdev, (void *)&(axiom_mem_dev[ni]));
 
-	axiom_mem_dev[ni].datum = 10 + ni;
-
 #if 0
-	axiom_mem_dev[ni].memory.base = (u64)r.start;
-	axiom_mem_dev[ni].memory.size = resource_size(&r);
+	axiom_mem_dev[ni].memory->base = (u64)r.start;
+	axiom_mem_dev[ni].memory->size = resource_size(&r);
 
-	axiom_mem_dev[ni].memory.priv_mem.start = axiom_mem_dev[ni].memory.base;
-	axiom_mem_dev[ni].memory.priv_mem.end = axiom_mem_dev[ni].memory.base;
-	axiom_mem_dev[ni].memory.priv_mem.size = 0;
+	axiom_mem_dev[ni].memory->priv_mem.start = axiom_mem_dev[ni].memory->base;
+	axiom_mem_dev[ni].memory->priv_mem.end = axiom_mem_dev[ni].memory->base;
+	axiom_mem_dev[ni].memory->priv_mem.size = 0;
 
-	axiom_mem_dev[ni].memory.shared_mem.start =
-		axiom_mem_dev[ni].memory.shared_mem.end =
-						axiom_mem_dev[ni].memory.base
-						+ axiom_mem_dev[ni].memory.size;
-	axiom_mem_dev[ni].memory.shared_mem.size = 0;
+	axiom_mem_dev[ni].memory->shared_mem.start =
+		axiom_mem_dev[ni].memory->shared_mem.end =
+						axiom_mem_dev[ni].memory->base
+						+ axiom_mem_dev[ni].memory->size;
+	axiom_mem_dev[ni].memory->shared_mem.size = 0;
 #else
-	axiom_mem_dev_init_mem(&axiom_mem_dev[ni].memory, &r);
+pr_info("%s] memory: %p\n", __func__, &axiom_mem_dev[ni].memory);
+	axiom_mem_dev[ni].memory = mem_manager_create(of_node_full_name(np), &r);
+	if (axiom_mem_dev[ni].memory == NULL) {
+		dev_err(dev, "Unable to create memory handler for %s\n",
+			 of_node_full_name(np));
+		goto err3;
+	}
 	dump_mem(&(axiom_mem_dev[ni]));
 #endif
 	++dev_num_instance;
 
+	of_node_put(np);
 	mutex_unlock(&manager_mutex);
 
 	dev_info(dev, "dev%d base = 0x%llx size = %zu\n", ni,
-		 axiom_mem_dev[ni].memory.base, axiom_mem_dev[ni].memory.size);
+		 axiom_mem_dev[ni].memory->base, axiom_mem_dev[ni].memory->size);
 
 
 	return 0;
 
+err3:
+	device_destroy(axiom_mem_dev_cl, axiom_mem_dev[ni].devt);
 err2:
 	cdev_del(&axiom_mem_dev[ni].c_dev);
 
 err1:
+	of_node_put(np);
 	mutex_unlock(&manager_mutex);
 
 	return ret;
