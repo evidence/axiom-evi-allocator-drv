@@ -287,20 +287,6 @@ int allocate_space(struct mem_config *memory, int tag, long start, long end)
 	return -ENOMEM;
 }
 
-void axiom_mem_dev_reset_mem(struct mem_config *memory)
-{
-	pr_info("%s]\n", __func__);
-
-	memory->priv_mem.start = memory->base;
-	memory->priv_mem.end = memory->base;
-	memory->priv_mem.size = 0;
-
-	memory->shared_mem.start = memory->shared_mem.end =
-							    memory->base
-							    + memory->size;
-	memory->shared_mem.size = 0;
-}
-
 void axiom_mem_dev_init_mem(struct mem_config *memory, struct resource *r)
 {
 	int err = 0;
@@ -311,7 +297,6 @@ void axiom_mem_dev_init_mem(struct mem_config *memory, struct resource *r)
 	memory->size = resource_size(r);
 
 	memory->virt_mem.start = memory->virt_mem.end = 0;
-	memory->virt_mem.size = 0;
 
 	err = init_space(&memory->alloc_list,
 			 &memory->free_list,
@@ -319,7 +304,6 @@ void axiom_mem_dev_init_mem(struct mem_config *memory, struct resource *r)
 			 memory->base + memory->size);
 
 	pr_info("%s] init_space = %d\n", __func__, err);
-	axiom_mem_dev_reset_mem(memory);
 }
 
 struct mem_mon_t {
@@ -399,7 +383,6 @@ struct mem_config *mem_manager_create(const char *s, struct resource *r)
 	memory->size = resource_size(r);
 
 	memory->virt_mem.start = memory->virt_mem.end = 0;
-	memory->virt_mem.size = 0;
 
 	err = init_space(&memory->alloc_list,
 			 &memory->free_list,
@@ -413,7 +396,6 @@ struct mem_config *mem_manager_create(const char *s, struct resource *r)
 	if (e == NULL)
 		goto err1;
 
-	axiom_mem_dev_reset_mem(memory);
 	e->name = kstrdup(s, GFP_KERNEL);
 	if (e->name == NULL)
 		goto err2;

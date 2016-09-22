@@ -91,13 +91,7 @@ static void dump_mem(struct axiom_mem_dev_struct *adev)
 	dev_info(dev, "Phy mem\n");
 	dev_info(dev, "start   : 0x%llx\n", adev->memory->base);
 	dev_info(dev, "size    : %zu\n", adev->memory->size);
-
-	dev_info(dev, "Shared mem\n");
-	dev_info(dev, "start   : 0x%llx\n", adev->memory->shared_mem.start);
-	dev_info(dev, "end     : 0x%llx\n", adev->memory->shared_mem.end);
-	dev_info(dev, "size    : %zu\n", adev->memory->shared_mem.size);
 }
-
 
 /**/
 #if 0
@@ -296,7 +290,6 @@ static int axiom_mem_dev_close(struct inode *i, struct file *f)
 	free_space(dev->memory, &remove);
 	dump_dev_list(dev);
 
-	axiom_mem_dev_reset_mem(dev->memory);
 	dump_mem(dev);
 
 	kfree(pdata);
@@ -396,7 +389,7 @@ static long axiom_mem_dev_ioctl(struct file *f, unsigned int cmd,
 		if (err)
 			return -EFAULT;
 
-		err = setup_user_vaddr(&tmp, dev->memory);
+		err = setup_user_vaddr(dev->memory, &tmp);
 		/*TODO: error from ioctl or from returned structure? */
 
 		err = copy_to_user((void __user *)arg, &tmp, sizeof(tmp));
@@ -735,16 +728,6 @@ static int axiom_mem_dev_probe(struct platform_device *pdev)
 #if 0
 	axiom_mem_dev[ni].memory->base = (u64)r.start;
 	axiom_mem_dev[ni].memory->size = resource_size(&r);
-
-	axiom_mem_dev[ni].memory->priv_mem.start = axiom_mem_dev[ni].memory->base;
-	axiom_mem_dev[ni].memory->priv_mem.end = axiom_mem_dev[ni].memory->base;
-	axiom_mem_dev[ni].memory->priv_mem.size = 0;
-
-	axiom_mem_dev[ni].memory->shared_mem.start =
-		axiom_mem_dev[ni].memory->shared_mem.end =
-						axiom_mem_dev[ni].memory->base
-						+ axiom_mem_dev[ni].memory->size;
-	axiom_mem_dev[ni].memory->shared_mem.size = 0;
 #else
 pr_info("%s] memory: %p\n", __func__, &axiom_mem_dev[ni].memory);
 	axiom_mem_dev[ni].memory = mem_manager_create(of_node_full_name(np), &r);

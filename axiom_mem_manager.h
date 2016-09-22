@@ -11,7 +11,6 @@ struct list_elem_s {
 struct res_mem {
 	u64 start; /* unsigned long? */
 	u64 end; /* unsigned long? */
-	size_t size;
 };
 
 struct mem_config {
@@ -20,8 +19,6 @@ struct mem_config {
 	long v2p_offset;
 
 	struct res_mem virt_mem;
-	struct res_mem priv_mem;
-	struct res_mem shared_mem;
 
 	struct list_elem_s free_list;
 	struct list_elem_s alloc_list;
