@@ -62,6 +62,7 @@ static struct axiom_mem_dev_struct {
 
 struct fpriv_data_s {
 	struct axiom_mem_dev_struct *dev;
+	int axiom_app_id;
 	/*TODO busy list */
 };
 
@@ -240,6 +241,7 @@ static int axiom_mem_dev_open(struct inode *i, struct file *f)
 	/* f->private_data = dev; */
 
 	pdata->dev = dev;
+	pdata->axiom_app_id = TAG_APP_NONE;
 	/* TODO init lists */
 	f->private_data = pdata;
 
@@ -432,6 +434,21 @@ static long axiom_mem_dev_ioctl(struct file *f, unsigned int cmd,
 		err = copy_to_user((void __user *)arg, &tmp, sizeof(tmp));
 		if (err < 0)
 			return -EFAULT;
+		break;
+	}
+	case AXIOM_MEM_DEV_SET_APP_ID: {
+		int app_id;
+
+		err = copy_from_user(&app_id, (void __user *)arg, sizeof(app_id));
+		if (err)
+			return -EFAULT;
+
+		if (pdata->axiom_app_id != TAG_APP_NONE)
+			return -EINVAL;
+
+		pdata->axiom_app_id = app_id;
+		dev_info(dev->dev, "Set app id: %d\n", pdata->axiom_app_id);
+
 		break;
 	}
 

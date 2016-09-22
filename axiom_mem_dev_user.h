@@ -22,4 +22,5 @@ struct axiom_mem_dev_info {
 #define AXIOM_MEM_DEV_CONFIG_VMEM _IOWR(AXIOM_MEM_DEV_MAGIC, 103,\
 					struct axiom_mem_dev_info [1])
 
+#define AXIOM_MEM_DEV_SET_APP_ID  _IOWR(AXIOM_MEM_DEV_MAGIC, 105, int)
 #endif /* AXIOM_MEM_DEV_USER_H */
