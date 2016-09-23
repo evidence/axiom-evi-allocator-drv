@@ -165,7 +165,7 @@ pr_info("%s] Added before LAST <%ld, %ld>\n", __func__, tmp->start, tmp->end);
 	return 0;
 }
 
-int mem_free_space(struct mem_config *memory, struct list_elem_s *e)
+int mem_free_space(struct mem_config *memory, int tag, long start, long end)
 {
 	struct list_head *pos, *q;
 	struct list_elem_s *tmp;
@@ -178,13 +178,13 @@ int mem_free_space(struct mem_config *memory, struct list_elem_s *e)
 
 	list_for_each_safe(pos, q, &(al->list)) {
 		tmp = list_entry(pos, struct list_elem_s, list);
-		if (tmp->tag != e->tag)
+		if (tmp->tag != tag)
 			continue;
 
-pr_info("Comparing <%ld,%ld> with <%ld,%ld>\n", tmp->start, tmp->end, e->start, e->end);
+pr_info("Comparing <%ld,%ld> with <%ld,%ld>\n", tmp->start, tmp->end, start, end);
 
-		if (e->start <= tmp->start && e->end >= tmp->end) {
-pr_info("All inside <%ld,%ld> in <%ld,%ld>\n", tmp->start, tmp->end, e->start, e->end);
+		if (start <= tmp->start && end >= tmp->end) {
+pr_info("All inside <%ld,%ld> in <%ld,%ld>\n", tmp->start, tmp->end, start, end);
 			add_element_merge(fl, tmp);
 			list_del(pos);
 			kfree(tmp);
@@ -192,9 +192,9 @@ pr_info("All inside <%ld,%ld> in <%ld,%ld>\n", tmp->start, tmp->end, e->start, e
 			continue;
 		}
 
-		if (tmp->start <= e->start && tmp->end >= e->end) {
-pr_info("Region <%ld,%ld> contains <%ld,%ld>\n", tmp->start, tmp->end, e->start, e->end);
-			rem = dup_element(e);
+		if (tmp->start <= start && tmp->end >= end) {
+pr_info("Region <%ld,%ld> contains <%ld,%ld>\n", tmp->start, tmp->end, start, end);
+			rem = new_element(start, end);
 			if (rem == NULL)
 				return -ENOMEM;
 
@@ -202,38 +202,38 @@ pr_info("Region <%ld,%ld> contains <%ld,%ld>\n", tmp->start, tmp->end, e->start,
 			if (err)
 				break;
 
-			rem = new_element(e->end, tmp->end);
+			rem = new_element(end, tmp->end);
 			if (rem == NULL)
 				return -ENOMEM;
 
 			rem->tag = tmp->tag;
 
-			tmp->end = e->start;
+			tmp->end = start;
 pr_info("Reinsert <%ld,%ld> after <%ld,%ld>\n", rem->start, rem->end, tmp->start, tmp->end);
 			list_add(&(rem->list), &(tmp->list));
 
 			return 0;
 		}
 
-		if (tmp->end >= e->start && tmp->end <= e->end) {
-			rem = new_element(e->start, tmp->end);
+		if (tmp->end >= start && tmp->end <= end) {
+			rem = new_element(start, tmp->end);
 			if (rem == NULL)
 				return -ENOMEM;
 
 pr_info("change <%ld,%ld> with <%ld,%ld>\n", tmp->start, tmp->end, rem->start, rem->end);
-			tmp->end = e->start;
+			tmp->end = start;
 			err = add_element_merge(fl, rem);
 			if (err)
 				break;
 		}
 
-		if (tmp->start >= e->start && tmp->start <= e->end) {
-			rem = new_element(tmp->start, e->end);
+		if (tmp->start >= start && tmp->start <= end) {
+			rem = new_element(tmp->start, end);
 			if (rem == NULL)
 				return -ENOMEM;
 
 pr_info("change <%ld,%ld> with <%ld,%ld>\n", tmp->start, tmp->end, rem->start, rem->end);
-			tmp->start = e->end;
+			tmp->start = end;
 			err = add_element_merge(fl, rem);
 			if (err)
 				break;

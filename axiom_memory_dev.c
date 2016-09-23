@@ -190,7 +190,6 @@ static int force_mmap(struct file *file, struct vm_area_struct *vma)
 
 /**/
 
-
 static int axiom_mem_dev_open(struct inode *i, struct file *f)
 {
 	struct mm_struct *mm;
@@ -264,14 +263,10 @@ static int axiom_mem_dev_close(struct inode *i, struct file *f)
 {
 	struct fpriv_data_s *pdata = f->private_data;
 	struct axiom_mem_dev_struct *dev = pdata->dev;
-	struct list_elem_s remove;
 
 	pr_info("Driver: close()\n");
 
-	remove.tag = pdata->axiom_app_id;
-	remove.start = 0;
-	remove.end = LONG_MAX;
-	mem_free_space(dev->memory, &remove);
+	mem_free_space(dev->memory, pdata->axiom_app_id, 0, LONG_MAX);
 	mem_dump_list(dev->memory);
 
 	dump_mem(dev);
@@ -405,20 +400,19 @@ static long axiom_mem_dev_ioctl(struct file *f, unsigned int cmd,
 	}
 	case AXIOM_MEM_DEV_REVOKE_MEM: {
 		struct axiom_mem_dev_info tmp;
-		struct list_elem_s rem;
+		long start, end;
 
 		err = copy_from_user(&tmp, (void __user *)arg, sizeof(tmp));
 		if (err)
 			return -EFAULT;
 
-		rem.tag = pdata->axiom_app_id;
-		rem.start = axiom_v2p(dev->memory, tmp.base);
-		rem.end = rem.start + tmp.size;
+		start = axiom_v2p(dev->memory, tmp.base);
+		end = start + tmp.size;
 
 		pr_info("%s] free_space for <%ld,%ld> (sz=%ld)\n", __func__,
-			rem.start, rem.end, tmp.size);
+			start, end, tmp.size);
 
-		err = mem_free_space(dev->memory, &rem);
+		err = mem_free_space(dev->memory, pdata->axiom_app_id, start, end);
 		if (err)
 			return err;
 
