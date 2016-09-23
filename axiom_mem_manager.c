@@ -297,24 +297,6 @@ int mem_allocate_space(struct mem_config *memory, int tag, long start, long end)
 	return -ENOMEM;
 }
 
-void axiom_mem_dev_init_mem(struct mem_config *memory, struct resource *r)
-{
-	int err = 0;
-
-	pr_info("%s]\n", __func__);
-
-	memory->base = (u64)r->start;
-	memory->size = resource_size(r);
-
-	memory->virt_mem.start = memory->virt_mem.end = 0;
-
-	err = init_space(&memory->alloc_list,
-			 &memory->free_list,
-			 memory->base,
-			 memory->base + memory->size);
-
-	pr_info("%s] init_space = %d\n", __func__, err);
-}
 
 struct mem_mon_t {
 	struct list_head list;

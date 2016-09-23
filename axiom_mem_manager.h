@@ -34,7 +34,6 @@ static inline unsigned long axiom_v2p(struct mem_config *mem,
 int mem_allocate_space(struct mem_config *memory, int tag,
 		       long start, long end);
 int mem_free_space(struct mem_config *memory, struct list_elem_s *e);
-void axiom_mem_dev_init_mem(struct mem_config *memory, struct resource *r);
 void mem_dump_list(struct mem_config *mem);
 
 struct mem_config *mem_manager_create(const char *s, struct resource *r);
