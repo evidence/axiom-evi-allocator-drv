@@ -68,17 +68,6 @@ struct fpriv_data_s {
 static unsigned long gaddr;
 void *io_map;
 
-static void dump_mem(struct axiom_mem_dev_struct *adev)
-{
-	struct device *dev = adev->dev;
-
-	dev_info(dev, "Phy mem\n");
-#if 0
-	dev_info(dev, "start   : 0x%llx\n", adev->memory->base);
-	dev_info(dev, "size    : %zu\n", adev->memory->size);
-#endif
-}
-
 /**/
 #if 0
 static int force_mmap(struct file *file, struct vm_area_struct *vma)
@@ -270,8 +259,6 @@ static int axiom_mem_dev_close(struct inode *i, struct file *f)
 	mem_free_space(dev->memory, pdata->axiom_app_id, 0, LONG_MAX);
 	mem_dump_list(dev->memory);
 
-	dump_mem(dev);
-
 	kfree(pdata);
 
 	return 0;
@@ -356,10 +343,9 @@ static long axiom_mem_dev_ioctl(struct file *f, unsigned int cmd,
 		struct axiom_mem_dev_info tmp;
 
 		err = mem_get_phy_space(dev->memory, &tmp.base, &tmp.size);
-#if 0
-		tmp.base = dev->memory->base;
-		tmp.size = dev->memory->size;
-#endif
+		if (err)
+			return -EINVAL;
+
 		err = copy_to_user((void __user *)arg, &tmp, sizeof(tmp));
 		if (err < 0)
 			return -EFAULT;
@@ -632,9 +618,6 @@ static const struct file_operations pugs_fops = {
 	.mmap = axiom_mem_dev_mmap,
 };
 
-
-#define DMA_SIZE (39 * 1024 * 1024 + 256 /*(256 - 256) * 4096*/)
-/* #define DMA_SIZE (8000 * 4096) */
 dma_addr_t dma_handle;
 void *buffer_addr;
 
@@ -707,10 +690,6 @@ static int axiom_mem_dev_probe(struct platform_device *pdev)
 	dev_set_drvdata(axiom_mem_dev[ni].dev, (void *)&(axiom_mem_dev[ni]));
 	platform_set_drvdata(pdev, (void *)&(axiom_mem_dev[ni]));
 
-#if 0
-	axiom_mem_dev[ni].memory->base = (u64)r.start;
-	axiom_mem_dev[ni].memory->size = resource_size(&r);
-#else
 pr_info("%s] memory: %p\n", __func__, &axiom_mem_dev[ni].memory);
 	axiom_mem_dev[ni].memory = mem_manager_create(of_node_full_name(np), &r);
 	if (axiom_mem_dev[ni].memory == NULL) {
@@ -718,8 +697,7 @@ pr_info("%s] memory: %p\n", __func__, &axiom_mem_dev[ni].memory);
 			 of_node_full_name(np));
 		goto err3;
 	}
-	dump_mem(&(axiom_mem_dev[ni]));
-#endif
+
 	++dev_num_instance;
 
 	of_node_put(np);
