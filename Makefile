@@ -14,7 +14,7 @@ else
     CROSS_COMPILE :=
 endif
 
-axiom_mem_dev-objs := axiom_mem_dev_lib.o axiom_memory_dev.o axiom_mem_manager.o
+axiom_mem_dev-objs := axiom_memory_dev.o axiom_mem_manager.o
 obj-m += axiom_mem_dev.o
 
 all:
