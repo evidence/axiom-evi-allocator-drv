@@ -5,7 +5,7 @@
 
 #include "axiom_mem_manager.h"
 
-void dump_list(struct list_elem_s *list)
+static void dump_list(struct list_elem_s *list)
 {
 	struct list_elem_s *tmp;
 	int i = 0;
@@ -17,6 +17,16 @@ void dump_list(struct list_elem_s *list)
 	}
 }
 
+void mem_dump_list(struct mem_config *mem)
+{
+	if (mem == NULL)
+		return;
+
+	pr_info("alloc list:\n");
+	dump_list(&mem->alloc_list);
+	pr_info("free list:\n");
+	dump_list(&mem->free_list);
+}
 
 static struct list_elem_s *new_element(long start, long end)
 {
@@ -26,7 +36,7 @@ static struct list_elem_s *new_element(long start, long end)
 	if (d) {
 		d->start = start;
 		d->end = end;
-		d->tag = TAG_APP_NONE;
+		d->tag = TAG_NONE;
 	}
 
 	return d;
@@ -155,7 +165,7 @@ pr_info("%s] Added before LAST <%ld, %ld>\n", __func__, tmp->start, tmp->end);
 	return 0;
 }
 
-int free_space(struct mem_config *memory, struct list_elem_s *e)
+int mem_free_space(struct mem_config *memory, struct list_elem_s *e)
 {
 	struct list_head *pos, *q;
 	struct list_elem_s *tmp;
@@ -233,7 +243,7 @@ pr_info("change <%ld,%ld> with <%ld,%ld>\n", tmp->start, tmp->end, rem->start, r
 	return err;
 }
 
-int allocate_space(struct mem_config *memory, int tag, long start, long end)
+int mem_allocate_space(struct mem_config *memory, int tag, long start, long end)
 {
 	struct list_head *pos;
 	struct list_elem_s *tmp;

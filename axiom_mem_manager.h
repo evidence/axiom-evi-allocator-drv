@@ -23,7 +23,7 @@ struct mem_config {
 	struct list_elem_s free_list;
 	struct list_elem_s alloc_list;
 };
-#define TAG_APP_NONE (-1)
+#define TAG_NONE (-1)
 
 static inline unsigned long axiom_v2p(struct mem_config *mem,
 				      unsigned long vaddr)
@@ -31,11 +31,11 @@ static inline unsigned long axiom_v2p(struct mem_config *mem,
 	return vaddr + mem->v2p_offset;
 }
 
-int allocate_space(struct mem_config *memory, int tag, long start, long end);
-int free_space(struct mem_config *memory, struct list_elem_s *e);
-void axiom_mem_dev_reset_mem(struct mem_config *memory);
+int mem_allocate_space(struct mem_config *memory, int tag,
+		       long start, long end);
+int mem_free_space(struct mem_config *memory, struct list_elem_s *e);
 void axiom_mem_dev_init_mem(struct mem_config *memory, struct resource *r);
-void dump_list(struct list_elem_s *list);
+void mem_dump_list(struct mem_config *mem);
 
 struct mem_config *mem_manager_create(const char *s, struct resource *r);
 struct mem_config *mem_manager_find_by_name(const char *s);

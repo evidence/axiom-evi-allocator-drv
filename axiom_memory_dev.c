@@ -67,22 +67,9 @@ struct fpriv_data_s {
 	/*TODO busy list */
 };
 
+#define TAG_APP_NONE (TAG_NONE)
 static unsigned long gaddr;
 void *io_map;
-
-void dump_dev_list(struct axiom_mem_dev_struct *adev)
-{
-	struct device *dev = adev->dev;
-	struct list_elem_s *list;
-
-	list = &(adev->memory->alloc_list);
-	dev_info(dev, "alloc list:\n");
-	dump_list(list);
-
-	list = &(adev->memory->free_list);
-	dev_info(dev, "free list:\n");
-	dump_list(list);
-}
 
 static void dump_mem(struct axiom_mem_dev_struct *adev)
 {
@@ -217,7 +204,6 @@ static int axiom_mem_dev_open(struct inode *i, struct file *f)
 	struct axiom_mem_dev_struct *dev =
 		container_of(i->i_cdev, struct axiom_mem_dev_struct, c_dev);
 
-
 	struct vm_area_struct vma;
 	long vmaddr;
 
@@ -287,8 +273,8 @@ static int axiom_mem_dev_close(struct inode *i, struct file *f)
 	remove.tag = pdata->axiom_app_id;
 	remove.start = 0;
 	remove.end = LONG_MAX;
-	free_space(dev->memory, &remove);
-	dump_dev_list(dev);
+	mem_free_space(dev->memory, &remove);
+	mem_dump_list(dev->memory);
 
 	dump_mem(dev);
 
@@ -409,13 +395,13 @@ static long axiom_mem_dev_ioctl(struct file *f, unsigned int cmd,
 		tmp.base = axiom_v2p(dev->memory, tmp.base);
 		pr_info("%s] PHY allocate_space for <%ld,%ld> (sz=%ld)\n", __func__,
 			tmp.base, tmp.base + tmp.size, tmp.size);
-		err = allocate_space(dev->memory,
+		err = mem_allocate_space(dev->memory,
 				     pdata->axiom_app_id, tmp.base,
 				     tmp.base + tmp.size);
 		if (err)
 			return err;
 
-		dump_dev_list(dev);
+		mem_dump_list(dev->memory);
 
 		break;
 	}
@@ -434,11 +420,11 @@ static long axiom_mem_dev_ioctl(struct file *f, unsigned int cmd,
 		pr_info("%s] free_space for <%ld,%ld> (sz=%ld)\n", __func__,
 			rem.start, rem.end, tmp.size);
 
-		err = free_space(dev->memory, &rem);
+		err = mem_free_space(dev->memory, &rem);
 		if (err)
 			return err;
 
-		dump_dev_list(dev);
+		mem_dump_list(dev->memory);
 
 		break;
 	}
