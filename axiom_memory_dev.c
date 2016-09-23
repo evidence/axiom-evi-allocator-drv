@@ -47,7 +47,6 @@
 
 static dev_t first_dev;   /* first device number  */
 
-
 #define MAX_DEVICES_NUMBER 5
 static struct class *axiom_mem_dev_cl;  /* device class */
 static DEFINE_MUTEX(manager_mutex);
@@ -64,7 +63,6 @@ static struct axiom_mem_dev_struct {
 struct fpriv_data_s {
 	struct axiom_mem_dev_struct *dev;
 	int axiom_app_id;
-	/*TODO busy list */
 };
 
 #define TAG_APP_NONE (TAG_NONE)
