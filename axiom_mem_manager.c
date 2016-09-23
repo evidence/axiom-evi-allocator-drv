@@ -57,7 +57,7 @@ static void merge_elem(struct list_elem_s *c, struct list_head *n)
 	}
 }
 
-int add_element_sorted(struct list_elem_s *l, struct list_elem_s *e)
+static int add_element_sorted(struct list_elem_s *l, struct list_elem_s *e)
 {
 	struct list_elem_s *tmp;
 	struct list_head *pos;
