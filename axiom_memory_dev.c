@@ -81,49 +81,9 @@ static int axiom_mem_dev_open(struct inode *i, struct file *f)
 	if (pdata == NULL)
 		return -ENOMEM;
 
-	/* f->private_data = dev; */
-
 	pdata->dev = dev;
 	pdata->axiom_app_id = TAG_APP_NONE;
-	/* TODO init lists */
 	f->private_data = pdata;
-
-	mm = get_task_mm(current);
-	if (IS_ERR(mm))
-		pr_info("Unable to get mm\n");
-
-	mm2 = current->mm;
-	if (mm2)
-		pr_info("valid mm2\n");
-	else
-		pr_info("INvalid mm2\n");
-
-	pr_info("MM: %p   mm2: %p\n", mm, mm2);
-	vma.vm_start = 0x4000000000;
-	vma.vm_end = 0x4040000000;
-	vma.vm_pgoff = 0;
-#if 0
-	vma.vm_flags = VM_SHARED | VM_READ | VM_WRITE
-		       | MAP_SHARED | MAP_LOCKED;
-#endif
-	vma.vm_flags = MAP_SHARED | MAP_LOCKED | MAP_FIXED;
-	vma.vm_mm = mm;
-
-	vma.vm_page_prot = PROT_READ | PROT_WRITE;
-	vma.vm_page_prot = PROT_NONE;
-	vma.vm_page_prot = pgprot_noncached(vma.vm_page_prot);
-
-	/* force_mmap(f, &vma); */
-
-	mmput(mm);
-
-	pr_info("Mapping vm_flags:%ld\n", vma.vm_flags);
-	vmaddr = vm_mmap(f, vma.vm_start, vma.vm_end - vma.vm_start,
-			 vma.vm_page_prot, vma.vm_flags, vma.vm_pgoff);
-	if (vmaddr < 0)
-		pr_err("Unable to vm_mmap\n");
-	else
-		pr_info("Mapped at %lx\n", vmaddr);
 
 	return 0;
 }
@@ -157,6 +117,50 @@ static ssize_t axiom_mem_dev_write(struct file *f, const char __user *buf,
 	pr_info("Driver: write()\n");
 
 	return len;
+}
+
+static int axiom_mem_dev_map_to_userspace(struct file *f,
+					  struct axiom_mem_dev_info *region,
+					  unsigned long offset)
+{
+	struct mm_struct *mm;
+	struct vm_area_struct vma;
+	long vmaddr;
+
+	mm = get_task_mm(current);
+	if (IS_ERR(mm))
+		pr_info("Unable to get mm\n");
+
+	vma.vm_start = region->base;
+	vma.vm_end = region->base + region->size;
+	vma.vm_pgoff = offset;
+
+	pr_info("Offset : 0x%lx\n", offset);
+#if 0
+	vma.vm_flags = VM_SHARED | VM_READ | VM_WRITE
+		       | MAP_SHARED | MAP_LOCKED;
+#endif
+	vma.vm_flags = MAP_SHARED | MAP_LOCKED | MAP_FIXED;
+	vma.vm_mm = mm;
+
+	vma.vm_page_prot = PROT_READ | PROT_WRITE;
+	vma.vm_page_prot = PROT_NONE;
+	vma.vm_page_prot = pgprot_noncached(vma.vm_page_prot);
+
+	/* force_mmap(f, &vma); */
+
+	mmput(mm);
+
+	pr_info("Mapping vm_flags:%ld\n", vma.vm_flags);
+	vmaddr = vm_mmap(f, vma.vm_start, vma.vm_end - vma.vm_start,
+			 vma.vm_page_prot, vma.vm_flags, vma.vm_pgoff);
+	if (vmaddr < 0) {
+		pr_err("Unable to vm_mmap\n");
+		return -1;
+	} else {
+		pr_info("Mapped at %lx\n", vmaddr);
+	}
+	return 0;
 }
 
 static long axiom_mem_dev_ioctl(struct file *f, unsigned int cmd,
@@ -199,6 +203,7 @@ static long axiom_mem_dev_ioctl(struct file *f, unsigned int cmd,
 	}
 	case AXIOM_MEM_DEV_RESERVE_MEM: {
 		struct axiom_mem_dev_info tmp;
+		unsigned long offset;
 
 		err = copy_from_user(&tmp, (void __user *)arg, sizeof(tmp));
 		if (err)
@@ -208,9 +213,11 @@ static long axiom_mem_dev_ioctl(struct file *f, unsigned int cmd,
 			tmp.base, tmp.base + tmp.size, tmp.size);
 		err = mem_allocate_space(dev->memory,
 				     pdata->axiom_app_id, tmp.base,
-				     tmp.base + tmp.size);
+				     tmp.base + tmp.size, &offset);
 		if (err)
 			return err;
+
+		err = axiom_mem_dev_map_to_userspace(f, &tmp, offset);
 
 		mem_dump_list(dev->memory);
 

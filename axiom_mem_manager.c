@@ -394,7 +394,8 @@ static int _mem_allocate_space(struct mem_config *memory, int tag,
 }
 
 int mem_allocate_space(struct mem_config *memory, int tag,
-		       long vaddr_start, long vaddr_end)
+		       long vaddr_start, long vaddr_end,
+		       unsigned long *offset)
 {
 	int ret;
 
@@ -403,6 +404,8 @@ int mem_allocate_space(struct mem_config *memory, int tag,
 
 	mutex_lock(&memory->mem_mutex);
 	ret = _mem_allocate_space(memory, tag, vaddr_start, vaddr_end);
+	if (ret == 0 && offset != NULL)
+		*offset = mem_v2p(memory, vaddr_start) - memory->base;
 	mutex_unlock(&memory->mem_mutex);
 
 	return ret;

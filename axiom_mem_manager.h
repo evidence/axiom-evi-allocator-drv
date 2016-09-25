@@ -10,7 +10,7 @@ int mem_manager_destroy(struct mem_config *memory);
 void mem_manager_dump(void);
 
 int mem_allocate_space(struct mem_config *memory, int tag,
-		       long vaddr_start, long vaddr_end);
+		       long vaddr_start, long vaddr_end, unsigned long *offset);
 int mem_free_space(struct mem_config *memory, int tag, long vaddr_start,
 		   long vaddr_end);
 int mem_setup_user_vaddr(struct mem_config *mem,
