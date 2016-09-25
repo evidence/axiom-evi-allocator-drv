@@ -4,6 +4,15 @@
 #include <linux/ioport.h>
 #include <linux/mutex.h>
 
+#include <linux/init.h>
+#include <linux/kernel.h>
+#include <linux/module.h>
+
+#include <linux/of.h>
+#include <linux/of_address.h>
+#include <linux/of_platform.h>
+#include <linux/of_reserved_mem.h>
+
 #include "axiom_mem_manager.h"
 
 struct list_elem_s {
@@ -277,6 +286,7 @@ struct mem_config *mem_manager_find_by_name(const char *s)
 
 	return mem;
 }
+EXPORT_SYMBOL_GPL(mem_manager_find_by_name);
 
 static int _remove_mem(struct mem_config *m)
 {
@@ -397,6 +407,7 @@ int mem_allocate_space(struct mem_config *memory, int tag,
 
 	return ret;
 }
+EXPORT_SYMBOL_GPL(mem_allocate_space);
 
 static int _mem_free_space(struct mem_config *memory, int tag,
 			   long vaddr_start, long vaddr_end)
@@ -493,6 +504,7 @@ int mem_free_space(struct mem_config *memory, int tag,
 
 	return err;
 }
+EXPORT_SYMBOL_GPL(mem_free_space);
 
 static inline int is_valid_res_mem(struct res_mem *mem)
 {
@@ -559,6 +571,7 @@ int mem_setup_user_vaddr(struct mem_config *mem,
 
 	return ret;
 }
+EXPORT_SYMBOL_GPL(mem_setup_user_vaddr);
 
 int mem_get_phy_space(struct mem_config *mem, unsigned long *base, size_t *size)
 {
@@ -574,6 +587,7 @@ int mem_get_phy_space(struct mem_config *mem, unsigned long *base, size_t *size)
 
 	return 0;
 }
+EXPORT_SYMBOL_GPL(mem_get_phy_space);
 
 void mem_dump_list(struct mem_config *mem)
 {
@@ -587,3 +601,57 @@ void mem_dump_list(struct mem_config *mem)
 	dump_list(&mem->free_list);
 	mutex_unlock(&mem->mem_mutex);
 }
+EXPORT_SYMBOL_GPL(mem_dump_list);
+
+static int __init mem_manager_init(void)
+{
+	struct device_node *node;
+	struct resource r;
+	int ret;
+
+	node = of_find_node_by_path("/");
+	if (node == NULL) {
+		pr_err("Unable to get OF ROOT\n");
+		return -ENXIO;
+	}
+
+	do {
+		node = of_find_node_by_name(node, "axiom_shared");
+		if (node != NULL) {
+			pr_info(">>> of_node_full_name = %s\n",
+				of_node_full_name(node));
+			ret = of_address_to_resource(node, 0, &r);
+			if (!ret) {
+				mem_manager_create(of_node_full_name(node), &r);
+			} else {
+				pr_err("Invalid resource\n");
+			}
+		}
+	} while (node != NULL);
+#if 0
+	/* of_node_put is called inside of_find_node_by_name */
+	/* of_node_put(root); */
+#endif
+
+	return 0;
+}
+
+static void __exit mem_manager_exit(void)
+{
+	struct list_head *pos, *q;
+	struct mem_mon_t *tmp;
+
+	list_for_each_safe(pos, q, &mem_list) {
+		tmp = list_entry(pos, struct mem_mon_t, list);
+		list_del(pos);
+		kfree(tmp->mem);
+		kfree(tmp);
+	}
+}
+
+subsys_initcall(mem_manager_init);
+module_exit(mem_manager_exit);
+
+MODULE_LICENSE("GPL");
+MODULE_AUTHOR("Bruno Morelli <b.morelli@evidence.eu.com");
+MODULE_DESCRIPTION("Axiom Memory Manager");

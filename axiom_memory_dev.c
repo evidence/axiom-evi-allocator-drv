@@ -337,11 +337,11 @@ static int axiom_mem_dev_probe(struct platform_device *pdev)
 {
 	struct device_node *np = pdev->dev.of_node;
 	struct device *dev = &pdev->dev;
-	struct resource r;
 	int ret;
 	int ni;
 	int major, minor;
 	dev_t devt;
+	struct mem_config *mem;
 
 	dev_info(dev, "%s M:%d m:%d   p=%p\n", __func__,
 		 MAJOR(dev->devt), MINOR(dev->devt), dev);
@@ -360,11 +360,14 @@ static int axiom_mem_dev_probe(struct platform_device *pdev)
 		dev_info(dev, "of_node_full_name = %s\n", of_node_full_name(np));
 	}
 
-	ret = of_address_to_resource(np, 0, &r);
-	if (ret) {
+	mem = mem_manager_find_by_name(of_node_full_name(np));
+	if (mem == NULL) {
+		dev_err(dev, "Unable to get memory <%s>\n",
+			of_node_full_name(np));
 		of_node_put(np);
-		return ret;
+			return -EINVAL;
 	}
+	of_node_put(np);
 
 	mutex_lock(&manager_mutex);
 	if (dev_num_instance > MAX_DEVICES_NUMBER) {
@@ -402,17 +405,11 @@ static int axiom_mem_dev_probe(struct platform_device *pdev)
 	dev_set_drvdata(axiom_mem_dev[ni].dev, (void *)&(axiom_mem_dev[ni]));
 	platform_set_drvdata(pdev, (void *)&(axiom_mem_dev[ni]));
 
+	axiom_mem_dev[ni].memory = mem;
 pr_info("%s] memory: %p\n", __func__, &axiom_mem_dev[ni].memory);
-	axiom_mem_dev[ni].memory = mem_manager_create(of_node_full_name(np), &r);
-	if (axiom_mem_dev[ni].memory == NULL) {
-		dev_err(dev, "Unable to create memory handler for %s\n",
-			 of_node_full_name(np));
-		goto err3;
-	}
 
 	++dev_num_instance;
 
-	of_node_put(np);
 	mutex_unlock(&manager_mutex);
 	{
 		unsigned long mem_base;
@@ -424,14 +421,13 @@ pr_info("%s] memory: %p\n", __func__, &axiom_mem_dev[ni].memory);
 	}
 
 	return 0;
-
+#if 0
 err3:
 	device_destroy(axiom_mem_dev_cl, axiom_mem_dev[ni].devt);
+#endif
 err2:
 	cdev_del(&axiom_mem_dev[ni].c_dev);
-
 err1:
-	of_node_put(np);
 	mutex_unlock(&manager_mutex);
 
 	return ret;
