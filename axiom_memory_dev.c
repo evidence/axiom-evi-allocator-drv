@@ -308,7 +308,7 @@ static int axiom_mem_dev_mmap(struct file *file, struct vm_area_struct *vma)
 	else
 		pr_info("OK for shared MAP\n");
 
-	phy_pfn = mem_base >> PAGE_SHIFT;
+	phy_pfn = (mem_base >> PAGE_SHIFT) + vma->vm_pgoff;
 
 	err = remap_pfn_range(vma, vma->vm_start, phy_pfn, size,
 			      vma->vm_page_prot);
