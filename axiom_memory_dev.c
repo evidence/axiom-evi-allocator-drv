@@ -144,7 +144,7 @@ static int axiom_mem_dev_map_to_userspace(struct file *f,
 	vma.vm_mm = mm;
 
 	vma.vm_page_prot = PROT_READ | PROT_WRITE;
-	vma.vm_page_prot = PROT_NONE;
+	/* vma.vm_page_prot = PROT_NONE; */
 	vma.vm_page_prot = pgprot_noncached(vma.vm_page_prot);
 
 	/* force_mmap(f, &vma); */
