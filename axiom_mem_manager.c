@@ -293,6 +293,7 @@ static int _remove_mem(struct mem_config *m)
 
 	if (r) {
 		list_del(&(r->list));
+		kfree(r);
 		ret = 0;
 		BUG_ON(mutex_is_locked(&(m->mem_mutex)));
 		kfree(m);
