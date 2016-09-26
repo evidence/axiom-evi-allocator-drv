@@ -78,9 +78,10 @@ static int axiom_mem_dev_open(struct inode *i, struct file *f)
 	pr_info("dev %d:%d\n", major, minor);
 
 	pdata = kmalloc(sizeof(*pdata), GFP_KERNEL);
-	if (pdata == NULL)
+	if (pdata == NULL) {
+		dev_err(dev->dev, "Not enough memory for file private data\n");
 		return -ENOMEM;
-
+	}
 	pdata->dev = dev;
 	pdata->axiom_app_id = TAG_APP_NONE;
 	f->private_data = pdata;
