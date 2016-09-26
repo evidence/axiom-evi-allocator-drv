@@ -18,5 +18,4 @@ int mem_setup_user_vaddr(struct mem_config *mem,
 int mem_get_phy_space(struct mem_config *mem, unsigned long *base, size_t *size);
 void mem_dump_list(struct mem_config *mem);
 
-
 #endif /* AXIOM_MEM_MANAGER_H */

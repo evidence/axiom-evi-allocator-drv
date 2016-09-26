@@ -268,7 +268,6 @@ err2:
 err1:
 	kfree(memory);
 	memory = NULL;
-
 out:
 	mutex_unlock(&manager_mutex);
 

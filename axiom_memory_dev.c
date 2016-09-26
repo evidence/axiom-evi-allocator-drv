@@ -140,8 +140,10 @@ static int axiom_mem_dev_map_to_userspace(struct file *f,
 #if 0
 	vma.vm_flags = VM_SHARED | VM_READ | VM_WRITE
 		       | MAP_SHARED | MAP_LOCKED;
-#endif
+#else
 	vma.vm_flags = MAP_SHARED | MAP_LOCKED | MAP_FIXED;
+#endif
+
 	vma.vm_mm = mm;
 
 	vma.vm_page_prot = PROT_READ | PROT_WRITE;
@@ -161,6 +163,7 @@ static int axiom_mem_dev_map_to_userspace(struct file *f,
 	} else {
 		pr_info("Mapped at %lx\n", vmaddr);
 	}
+
 	return 0;
 }
 
