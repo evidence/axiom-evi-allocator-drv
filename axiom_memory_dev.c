@@ -117,7 +117,7 @@ static ssize_t axiom_mem_dev_write(struct file *f, const char __user *buf,
 {
 	pr_info("Driver: write()\n");
 
-	return len;
+	return -ENOSYS;
 }
 
 static int axiom_mem_dev_map_to_userspace(struct file *f,
