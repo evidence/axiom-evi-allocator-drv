@@ -65,139 +65,18 @@ struct fpriv_data_s {
 };
 
 #define TAG_APP_NONE (TAG_NONE)
-static unsigned long gaddr;
-void *io_map;
-
-/**/
-#if 0
-static int force_mmap(struct file *file, struct vm_area_struct *vma)
-{
-	struct axiom_mem_dev_struct *dev = file->private_data;
-	size_t size = vma->vm_end - vma->vm_start;
-	unsigned long vm_pgoff_orig;
-	unsigned long phy_pfn;
-	int err;
-
-	pr_info("Driver: mmap()\n");
-	pr_info("1) vma = 0x%lx-0x%lx\n", vma->vm_start, vma->vm_end);
-
-	vm_pgoff_orig = vma->vm_pgoff;
-	pr_info("1) pg_off = %lx\n", vma->vm_pgoff);
-
-	/* vma->vm_pgoff = (0x70000000 >> PAGE_SHIFT); */
-	pr_info("2) pg_off = %lx\n", vma->vm_pgoff);
-
-	if (size > dev->memory->size) {
-		pr_err("%zu > max size (%zu)\n", size, dev->memory->size);
-		return -EAGAIN;
-	}
-
-#if 0
-	vma->vm_page_prot = phys_mem_access_prot(file, vma->vm_pgoff, size,
-						 vma->vm_page_prot);
-	vma->vm_ops = &mmap_mem_ops;
-#else
-	vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
-#endif
-
-	/* Remap-pfn-range will mark the range VM_IO */
-#if 1
-
-	pr_info("io_map = %p  pfn = %ld\n", io_map, vmalloc_to_pfn(io_map));
-	pr_info("vm_page_prot = 0x%llx", pgprot_val(vma->vm_page_prot));
-
-	if ((vma->vm_flags & VM_SHARED) != VM_SHARED)
-		pr_info("No shared MAP!!!!!!!!!!!!!!!!!\n");
-	else
-		pr_info("OK for shared MAP\n");
-
-	phy_pfn = dev->memory->base >> PAGE_SHIFT;
-
-	err = remap_pfn_range(vma, vma->vm_start, phy_pfn, size,
-			      vma->vm_page_prot);
-	if (err) {
-		pr_err("remap_pfn_range failed\n");
-		return -EAGAIN;
-	}
-#endif
-	gaddr = vma->vm_start;
-
-	{
-		pgd_t *pgd;
-		pmd_t *pmd;
-		pte_t *pte;
-		struct page *page = NULL;
-		pud_t *pud;
-		struct mm_struct *mm = current->mm;
-		unsigned long address = vma->vm_start;
-
-		pr_info("c->mm = %p v->vm_mm = %p\n", current->mm,
-		       vma->vm_mm);
-
-		mm = vma->vm_mm;
-
-		pgd = pgd_offset(mm, address);
-		if (pgd_none(*pgd))
-			pr_info("pgd none!\n");
-		if (unlikely(pgd_bad(*pgd)))
-			pr_info("pgd bad!\n");
-
-		pr_info("PGD (from pgd_offset): 0x%p\n", pgd);
-		pr_info("PGD (from mm )       : 0x%p\n", mm->pgd);
-
-		pud = pud_offset(pgd, address);
-		if (pud_none(*pud))
-			pr_info("pud none!\n");
-		if (unlikely(pud_bad(*pud)))
-			pr_info("pud bad!\n");
-
-		pmd = pmd_offset(pud, address);
-		if (pmd_none(*pmd))
-			pr_info("pmd none!\n");
-		if (unlikely(pmd_bad(*pmd)))
-			pr_info("pmd bad!\n");
-
-		pte = pte_offset_map(pmd, address);
-		if (pte_none(*pte))
-			pr_info("pte none!\n");
-
-		pr_info("pte       : 0x%p\n", pte);
-
-		page = pte_page(*pte);
-		/* pte_modify(*pte, pgprot_kernel); */
-
-		pr_info("page      : 0x%p\n", page);
-		pr_info("page2phys : 0x%llx\n", page_to_phys(page));
-
-		pr_info("PTE: 0x%p\n", pte);
-	}
-
-/*	vma->vm_pgoff = vm_pgoff_orig; */
-	pr_info("3) pg_off = %lx\n", vma->vm_pgoff);
-	return 0;
-}
-#endif
-
-/**/
 
 static int axiom_mem_dev_open(struct inode *i, struct file *f)
 {
-	struct mm_struct *mm;
-	struct mm_struct *mm2;
 	struct fpriv_data_s *pdata;
 	int minor = iminor(i);
 	int major = imajor(i);
-
 	struct axiom_mem_dev_struct *dev =
 		container_of(i->i_cdev, struct axiom_mem_dev_struct, c_dev);
-
-	struct vm_area_struct vma;
-	long vmaddr;
 
 	pr_info("Driver: open()\n");
 	pr_info("dev %d:%d\n", major, minor);
 
-	pr_info("sizeof(struct page): %ld\n", sizeof(struct page));
 	pdata = kmalloc(sizeof(*pdata), GFP_KERNEL);
 	if (pdata == NULL)
 		return -ENOMEM;
@@ -264,58 +143,10 @@ static int axiom_mem_dev_close(struct inode *i, struct file *f)
 	return 0;
 }
 
-static void print_phys(struct mm_struct *mm)
-{
-	pgd_t *pgd;
-	pmd_t *pmd;
-	pte_t *pte;
-	struct page *page = NULL;
-	pud_t *pud;
-	unsigned long address = gaddr;
-
-	pr_info("g address: 0x%lx\n", address);
-	pgd = pgd_offset(mm, address);
-	if (pgd_none(*pgd))
-		pr_info("pgd none!\n");
-	if (unlikely(pgd_bad(*pgd)))
-		pr_info("pgd bad!\n");
-
-	pr_info("PGD (from pgd_offset): 0x%p\n", pgd);
-	pr_info("PGD (from mm )       : 0x%p\n", mm->pgd);
-
-	pud = pud_offset(pgd, address);
-	if (pud_none(*pud))
-		pr_info("pud none!\n");
-	if (unlikely(pud_bad(*pud)))
-		pr_info("pud bad!\n");
-
-	pmd = pmd_offset(pud, address);
-	if (pmd_none(*pmd))
-		pr_info("pmd none!\n");
-	if (unlikely(pmd_bad(*pmd)))
-		pr_info("pmd bad!\n");
-
-	pte = pte_offset_map(pmd, address);
-	if (pte_none(*pte))
-		pr_info("pte none!\n");
-
-	pr_info("pte       : 0x%p\n", pte);
-
-	page = pte_page(*pte);
-	pr_info("page      : 0x%p\n", page);
-	pr_info("page2phys : 0x%llx\n", page_to_phys(page));
-	pr_info("PTE: 0x%p\n", pte);
-}
-
 static ssize_t axiom_mem_dev_read(struct file *f, char __user *buf, size_t len,
 				  loff_t *off)
 {
-	/* struct fpriv_data_s *pdata = f->private_data;
-	struct axiom_mem_dev_struct *dev = pdata->dev; */
-
 	pr_info("Driver: read()\n");
-
-	print_phys(current->mm);
 
 	return -ENOSYS;
 }
@@ -443,24 +274,14 @@ static int axiom_mem_dev_mmap(struct file *file, struct vm_area_struct *vma)
 	size_t size = vma->vm_end - vma->vm_start;
 	size_t mem_size;
 	unsigned long mem_base;
-	unsigned long vm_pgoff_orig;
 	unsigned long phy_pfn;
 	int err;
 
 	pr_info("Driver: mmap()\n");
 	pr_info("1) vma = 0x%lx-0x%lx\n", vma->vm_start, vma->vm_end);
 
-	vm_pgoff_orig = vma->vm_pgoff;
-	pr_info("1) pg_off = %lx\n", vma->vm_pgoff);
+	pr_info("pg_off = %lx\n", vma->vm_pgoff);
 
-	/* vma->vm_pgoff = (0x70000000 >> PAGE_SHIFT); */
-	pr_info("2) pg_off = %lx\n", vma->vm_pgoff);
-#if 0
-	if (size != (10 * PAGE_SIZE)) {
-		pr_err("%zu != PAGE_SIZE\n", size);
-		return -EAGAIN;
-	}
-#endif
 	mem_get_phy_space(dev->memory, &mem_base, &mem_size);
 	if (size > mem_size) {
 		pr_err("%zu > max size (%zu)\n", size, mem_size);
@@ -476,9 +297,7 @@ static int axiom_mem_dev_mmap(struct file *file, struct vm_area_struct *vma)
 #endif
 
 	/* Remap-pfn-range will mark the range VM_IO */
-#if 1
 
-	pr_info("io_map = %p  pfn = %ld\n", io_map, vmalloc_to_pfn(io_map));
 	pr_info("vm_page_prot = 0x%llx", pgprot_val(vma->vm_page_prot));
 
 	pr_info("N:%p P:%p\n", vma->vm_next, vma->vm_prev);
@@ -490,15 +309,6 @@ static int axiom_mem_dev_mmap(struct file *file, struct vm_area_struct *vma)
 		pr_info("OK for shared MAP\n");
 
 	phy_pfn = mem_base >> PAGE_SHIFT;
-#if 0
-	if (remap_pfn_range(vma, vma->vm_start,
-			    /*vma->vm_pgoff*/ (0x70000000 >> PAGE_SHIFT)
-			    /*vmalloc_to_pfn(io_map)*/, size,
-			    vma->vm_page_prot)) {
-		pr_err("remap_pfn_range failed\n");
-		return -EAGAIN;
-	}
-#endif
 
 	err = remap_pfn_range(vma, vma->vm_start, phy_pfn, size,
 			      vma->vm_page_prot);
@@ -506,105 +316,7 @@ static int axiom_mem_dev_mmap(struct file *file, struct vm_area_struct *vma)
 		pr_err("remap_pfn_range failed\n");
 		return -EAGAIN;
 	}
-#endif
-	gaddr = vma->vm_start;
 
-	{
-		pgd_t *pgd;
-		pmd_t *pmd;
-		pte_t *pte;
-		struct page *page = NULL;
-		pud_t *pud;
-		struct mm_struct *mm = current->mm;
-		unsigned long address = vma->vm_start;
-
-		pr_info("c->mm = %p v->vm_mm = %p\n", current->mm,
-		       vma->vm_mm);
-
-		mm = vma->vm_mm;
-
-		pgd = pgd_offset(mm, address);
-		if (pgd_none(*pgd))
-			pr_info("pgd none!\n");
-		if (unlikely(pgd_bad(*pgd)))
-			pr_info("pgd bad!\n");
-
-		pr_info("PGD (from pgd_offset): 0x%p\n", pgd);
-		pr_info("PGD (from mm )       : 0x%p\n", mm->pgd);
-
-		pud = pud_offset(pgd, address);
-		if (pud_none(*pud))
-			pr_info("pud none!\n");
-		if (unlikely(pud_bad(*pud)))
-			pr_info("pud bad!\n");
-
-		pmd = pmd_offset(pud, address);
-		if (pmd_none(*pmd))
-			pr_info("pmd none!\n");
-		if (unlikely(pmd_bad(*pmd)))
-			pr_info("pmd bad!\n");
-
-		pte = pte_offset_map(pmd, address);
-		if (pte_none(*pte))
-			pr_info("pte none!\n");
-
-		pr_info("pte       : 0x%p\n", pte);
-
-		page = pte_page(*pte);
-		/* pte_modify(*pte, pgprot_kernel); */
-#if 0
-	if (remap_pfn_range(vma, vma->vm_start,
-			    /*vma->vm_pgoff*/(0x70000000 >> PAGE_SHIFT), size,
-			    vma->vm_page_prot)) {
-		pr_err("remap_pfn_range failed\n");
-		return -EAGAIN;
-	}
-#endif
-
-		pr_info("page      : 0x%p\n", page);
-		pr_info("page2phys : 0x%llx\n", page_to_phys(page));
-
-#if 0
-		/* mapping in kernel memory: */
-		pr_info("b kmap\n");
-		kernel_address = kmap(page);
-		pr_info("a kmap\n");
-		/* memset((char *)kernel_address + 16, 0xde, 16); */
-
-		pr_info("kmap addr: 0x%p\n", kernel_address);
-		pr_info("virt2ph:%llx   vmalloc_addr? %s\n",
-		       (unsigned long long)__virt_to_phys(
-						(unsigned long)kernel_address),
-		       is_vmalloc_addr(kernel_address) ? "yes" : "no");
-
-
-		pr_info("vmalloc phy address 0x%llx\n",
-		       (unsigned long long)
-			PFN_PHYS(vmalloc_to_pfn(kernel_address)));
-
-		/* work with kernel_address.... */
-
-		pr_info("b kunmap\n");
-		kunmap(page);
-		pr_info("a kunmap\n");
-#endif
-
-#if 0
-		kernel_address = ioremap(page_to_phys(page), size);
-		pr_info("ioremap addr: 0x%p\n", kernel_address);
-		memset((char *)kernel_address + 16, 0xed, 16);
-		/* ((unsigned int *)kernel_address)[16] = 0xdededede; */
-		pr_info("vmalloc phy address 0x%llx\n",
-		       (unsigned long long)
-			PFN_PHYS(vmalloc_to_pfn(kernel_address)));
-		iounmap(kernel_address);
-#endif
-
-		pr_info("PTE: 0x%p\n", pte);
-	}
-
-/*	vma->vm_pgoff = vm_pgoff_orig; */
-	pr_info("3) pg_off = %lx\n", vma->vm_pgoff);
 	return 0;
 }
 
