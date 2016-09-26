@@ -155,7 +155,7 @@ static int axiom_mem_dev_map_to_userspace(struct file *f,
 	pr_info("Mapping vm_flags:%ld\n", vma.vm_flags);
 	vmaddr = vm_mmap(f, vma.vm_start, vma.vm_end - vma.vm_start,
 			 vma.vm_page_prot, vma.vm_flags, vma.vm_pgoff);
-	if (vmaddr < 0) {
+	if (IS_ERR_VALUE(vmaddr)) {
 		pr_err("Unable to vm_mmap\n");
 		return -1;
 	} else {
