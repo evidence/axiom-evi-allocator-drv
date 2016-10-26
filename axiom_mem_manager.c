@@ -113,7 +113,6 @@ static int init_space(struct list_elem_s *alist, struct list_elem_s *flist,
 {
 	struct list_elem_s *tmp;
 
-	pr_info("%s] start=%ld end=%ld\n", __func__, start, end);
 	if (start > end)
 		return -1;
 
@@ -122,7 +121,7 @@ static int init_space(struct list_elem_s *alist, struct list_elem_s *flist,
 
 	tmp = new_element(start, end);
 	if (tmp == NULL) {
-		pr_info("%s] Unable to allocate new_element\n", __func__);
+		pr_err("%s] Unable to allocate new_element\n", __func__);
 		return -1;
 	}
 	list_add(&(tmp->list), &(flist->list));
@@ -154,7 +153,6 @@ static int add_element_merge(struct list_elem_s *l, struct list_elem_s *d)
 		tmp = list_entry(pos, struct list_elem_s, list);
 		if (e->end == tmp->start) {
 			tmp->start = e->start;
-			/*TODO: merge with previous element */
 			n = pos->prev;
 			if (n != &(l->list)) {
 				tmp = list_entry(n, struct list_elem_s, list);
@@ -166,7 +164,6 @@ static int add_element_merge(struct list_elem_s *l, struct list_elem_s *d)
 
 		if (e->start == tmp->end) {
 			tmp->end = e->end;
-			/*TODO: merge with next element */
 			n = pos->next;
 			if (n != &(l->list)) {
 				merge_elem(tmp, n);
@@ -212,13 +209,11 @@ struct mem_config *mem_manager_create(const char *s, struct resource *r)
 	struct mem_config *memory;
 	struct mem_mon_t *e;
 
-	pr_info("%s]\n", __func__);
-
 	mutex_lock(&manager_mutex);
 	memory = _find_mem_by_name(s);
 	if (memory != NULL) {
 		mutex_unlock(&manager_mutex);
-		pr_info("Memory already registered\n");
+		pr_err("Memory already registered\n");
 		return NULL;
 	}
 
@@ -235,7 +230,6 @@ struct mem_config *mem_manager_create(const char *s, struct resource *r)
 			 &memory->free_list,
 			 memory->base,
 			 memory->base + memory->size);
-	pr_info("%s] init_space = %d\n", __func__, err);
 	if (err)
 		goto err1;
 
@@ -341,18 +335,18 @@ static int _mem_allocate_space(struct mem_config *memory, int tag,
 	fl = &(memory->free_list);
 	al = &(memory->alloc_list);
 
-	pr_info("%s] Searching zone for <%ld,%ld>\n", __func__, start, end);
-	pr_info("%s] memory: %p\n", __func__, memory);
+	pr_debug("%s] Searching zone for <%ld,%ld>\n", __func__, start, end);
+	pr_debug("%s] memory: %p\n", __func__, memory);
 
 	if (start >= end)
 		return -EINVAL;
 
 	list_for_each(pos, &(fl->list)) {
 		tmp = list_entry(pos, struct list_elem_s, list);
-		pr_info("%s] Got region: <%ld,%ld>\n", __func__,
+		pr_debug("%s] Got region: <%ld,%ld>\n", __func__,
 			tmp->start, tmp->end);
 		if (tmp->start <= start && tmp->end >= end) {
-			pr_info("%s] Hit region: <%ld,%ld>\n", __func__,
+			pr_debug("%s] Hit region: <%ld,%ld>\n", __func__,
 				tmp->start, tmp->end);
 			if (tmp->start < start) {
 				if (tmp->end > end) {
@@ -504,17 +498,16 @@ static int _mem_setup_user_vaddr(struct mem_config *memory,
 	struct res_mem tmp;
 	int err;
 
-	pr_info("%s] enter\n", __func__);
 	if (base == NULL || size == NULL) {
-		pr_info("%s] invalid base/size arguments\n", __func__);
+		pr_err("%s] invalid base/size arguments\n", __func__);
 		return 0;
 	}
 
 	if (is_valid_res_mem(&(memory->virt_mem))) {
 		*base = memory->virt_mem.start;
 		*size = memory->virt_mem.end - memory->virt_mem.start;
-		pr_info("%s] already allocated b=0x%zx s=%zu\n", __func__,
-			*base, *size);
+		pr_err("%s] already allocated b=0x%zx s=%zu\n", __func__,
+		       *base, *size);
 
 		return 0;
 	}
@@ -523,21 +516,21 @@ static int _mem_setup_user_vaddr(struct mem_config *memory,
 	tmp.start = *base;
 	tmp.end = *base + *size;
 
-	pr_info("%s] try using b=0x%llx s=%llu\n", __func__,
-		tmp.start, tmp.end - tmp.start);
+	pr_debug("%s] try using b=0x%llx s=%llu\n", __func__,
+		 tmp.start, tmp.end - tmp.start);
 	err = is_valid_res_mem(&tmp);
 	if (err) {
 		memory->virt_mem.start = tmp.start;
 		memory->virt_mem.end = tmp.end;
 		memory->v2p_offset = memory->base - memory->virt_mem.start;
-		pr_info("%s] set b=0x%llx s=%llu\n", __func__,
-			memory->virt_mem.start,
-			memory->virt_mem.end - memory->virt_mem.start);
+		pr_debug("%s] set b=0x%llx s=%llu\n", __func__,
+			 memory->virt_mem.start,
+			 memory->virt_mem.end - memory->virt_mem.start);
 	} else {
 		*size = 0;
 		*base = 0;
-		pr_info("%s] error set b=0x%lx s=%zu\n", __func__,
-			*base, *size);
+		pr_err("%s] error set b=0x%lx s=%zu\n", __func__,
+		       *base, *size);
 	}
 
 	return !err;
@@ -604,8 +597,8 @@ static int __init mem_manager_init(void)
 	do {
 		node = of_find_node_by_name(node, "axiom_shared");
 		if (node != NULL) {
-			pr_info(">>> of_node_full_name = %s\n",
-				of_node_full_name(node));
+			pr_debug(">>> of_node_full_name = %s\n",
+				 of_node_full_name(node));
 			ret = of_address_to_resource(node, 0, &r);
 			if (!ret) {
 				mem_manager_create(of_node_full_name(node), &r);
@@ -614,10 +607,6 @@ static int __init mem_manager_init(void)
 			}
 		}
 	} while (node != NULL);
-#if 0
-	/* of_node_put is called inside of_find_node_by_name */
-	/* of_node_put(root); */
-#endif
 
 	return 0;
 }

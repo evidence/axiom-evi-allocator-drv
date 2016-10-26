@@ -74,8 +74,7 @@ static int axiom_mem_dev_open(struct inode *i, struct file *f)
 	struct axiom_mem_dev_struct *dev =
 		container_of(i->i_cdev, struct axiom_mem_dev_struct, c_dev);
 
-	pr_info("Driver: open()\n");
-	pr_info("dev %d:%d\n", major, minor);
+	dev_dbg(dev->dev, "%s] dev %d:%d\n", __func__, major, minor);
 
 	pdata = kmalloc(sizeof(*pdata), GFP_KERNEL);
 	if (pdata == NULL) {
@@ -94,8 +93,6 @@ static int axiom_mem_dev_close(struct inode *i, struct file *f)
 	struct fpriv_data_s *pdata = f->private_data;
 	struct axiom_mem_dev_struct *dev = pdata->dev;
 
-	pr_info("Driver: close()\n");
-
 	mem_free_space(dev->memory, pdata->axiom_app_id, 0, LONG_MAX);
 	mem_dump_list(dev->memory);
 
@@ -107,16 +104,12 @@ static int axiom_mem_dev_close(struct inode *i, struct file *f)
 static ssize_t axiom_mem_dev_read(struct file *f, char __user *buf, size_t len,
 				  loff_t *off)
 {
-	pr_info("Driver: read()\n");
-
 	return -ENOSYS;
 }
 
 static ssize_t axiom_mem_dev_write(struct file *f, const char __user *buf,
 				   size_t len, loff_t *off)
 {
-	pr_info("Driver: write()\n");
-
 	return -ENOSYS;
 }
 
@@ -124,19 +117,22 @@ static int axiom_mem_dev_map_to_userspace(struct file *f,
 					  struct axiom_mem_dev_info *region,
 					  unsigned long offset)
 {
+	struct fpriv_data_s *pdata = f->private_data;
+	struct axiom_mem_dev_struct *dev = pdata->dev;
+
 	struct mm_struct *mm;
 	struct vm_area_struct vma;
 	long vmaddr;
 
 	mm = get_task_mm(current);
-	if (IS_ERR(mm))
-		pr_info("Unable to get mm\n");
-
+	if (IS_ERR(mm)) {
+		dev_err(dev->dev, "Unable to get mm\n");
+		return -1;
+	}
 	vma.vm_start = region->base;
 	vma.vm_end = region->base + region->size;
 	vma.vm_pgoff = offset;
 
-	pr_info("Offset : 0x%lx\n", offset);
 #if 0
 	vma.vm_flags = VM_SHARED | VM_READ | VM_WRITE
 		       | MAP_SHARED | MAP_LOCKED;
@@ -154,14 +150,14 @@ static int axiom_mem_dev_map_to_userspace(struct file *f,
 
 	mmput(mm);
 
-	pr_info("Mapping vm_flags:%ld\n", vma.vm_flags);
+	dev_dbg(dev->dev, "Mapping vm_flags:%ld\n", vma.vm_flags);
 	vmaddr = vm_mmap(f, vma.vm_start, vma.vm_end - vma.vm_start,
 			 vma.vm_page_prot, vma.vm_flags, vma.vm_pgoff);
 	if (IS_ERR_VALUE(vmaddr)) {
-		pr_err("Unable to vm_mmap\n");
+		dev_err(dev->dev, "Unable to vm_mmap\n");
 		return -1;
 	} else {
-		pr_info("Mapped at %lx\n", vmaddr);
+		dev_dbg(dev->dev, "Mapped at %lx\n", vmaddr);
 	}
 
 	return 0;
@@ -213,18 +209,18 @@ static long axiom_mem_dev_ioctl(struct file *f, unsigned int cmd,
 		if (err)
 			return -EFAULT;
 
-		pr_info("%s] allocate_space for <%ld,%ld> (sz=%ld)\n", __func__,
-			tmp.base, tmp.base + tmp.size, tmp.size);
+		dev_dbg(dev->dev, "%s] allocate_space <%ld,%ld>(sz=%ld)\n",
+			  __func__, tmp.base, tmp.base + tmp.size, tmp.size);
 		err = mem_allocate_space(dev->memory,
-				     pdata->axiom_app_id, tmp.base,
-				     tmp.base + tmp.size, &offset);
+					 pdata->axiom_app_id, tmp.base,
+					 tmp.base + tmp.size, &offset);
 		if (err)
 			return err;
 
 		err = axiom_mem_dev_map_to_userspace(f, &tmp, offset);
-
+#ifdef DEBUG
 		mem_dump_list(dev->memory);
-
+#endif
 		break;
 	}
 	case AXIOM_MEM_DEV_REVOKE_MEM: {
@@ -238,15 +234,16 @@ static long axiom_mem_dev_ioctl(struct file *f, unsigned int cmd,
 		start = tmp.base;
 		end = start + tmp.size;
 
-		pr_info("%s] free_space for <%ld,%ld> (sz=%ld)\n", __func__,
-			start, end, tmp.size);
+		dev_dbg(dev->dev, "%s] free_space <%ld,%ld>(sz=%ld)\n",
+			  __func__, start, end, tmp.size);
 
-		err = mem_free_space(dev->memory, pdata->axiom_app_id, start, end);
+		err = mem_free_space(dev->memory, pdata->axiom_app_id,
+				     start, end);
 		if (err)
 			return err;
-
+#ifdef DEBUG
 		mem_dump_list(dev->memory);
-
+#endif
 		break;
 	}
 	case AXIOM_MEM_DEV_SET_APP_ID: {
@@ -260,7 +257,7 @@ static long axiom_mem_dev_ioctl(struct file *f, unsigned int cmd,
 			return -EINVAL;
 
 		pdata->axiom_app_id = app_id;
-		dev_info(dev->dev, "Set app id: %d\n", pdata->axiom_app_id);
+		dev_dbg(dev->dev, "Set app id: %d\n", pdata->axiom_app_id);
 
 		break;
 	}
@@ -288,14 +285,13 @@ static int axiom_mem_dev_mmap(struct file *file, struct vm_area_struct *vma)
 	unsigned long phy_pfn;
 	int err;
 
-	pr_info("Driver: mmap()\n");
-	pr_info("1) vma = 0x%lx-0x%lx\n", vma->vm_start, vma->vm_end);
-
-	pr_info("pg_off = %lx\n", vma->vm_pgoff);
+	dev_dbg(dev->dev, "1) vma = 0x%lx-0x%lx\n", vma->vm_start,
+		  vma->vm_end);
+	dev_dbg(dev->dev, "pg_off = %lx\n", vma->vm_pgoff);
 
 	mem_get_phy_space(dev->memory, &mem_base, &mem_size);
 	if (size > mem_size) {
-		pr_err("%zu > max size (%zu)\n", size, mem_size);
+		dev_err(dev->dev, "%zu > max size (%zu)\n", size, mem_size);
 		return -EAGAIN;
 	}
 
@@ -307,24 +303,16 @@ static int axiom_mem_dev_mmap(struct file *file, struct vm_area_struct *vma)
 	vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
 #endif
 
-	/* Remap-pfn-range will mark the range VM_IO */
-
-	pr_info("vm_page_prot = 0x%llx", pgprot_val(vma->vm_page_prot));
-
-	pr_info("N:%p P:%p\n", vma->vm_next, vma->vm_prev);
-	pr_info("vm_mm:%p\n", vma->vm_mm);
-
 	if ((vma->vm_flags & VM_SHARED) != VM_SHARED)
-		pr_info("No shared MAP!!!!!!!!!!!!!!!!!\n");
-	else
-		pr_info("OK for shared MAP\n");
+		dev_dbg(dev->dev, "No shared MAP!!!!!!!!!!!!!!!!!\n");
 
 	phy_pfn = (mem_base >> PAGE_SHIFT) + vma->vm_pgoff;
 
+	/* remap-pfn-range will mark the range VM_IO */
 	err = remap_pfn_range(vma, vma->vm_start, phy_pfn, size,
 			      vma->vm_page_prot);
 	if (err) {
-		pr_err("remap_pfn_range failed\n");
+		dev_err(dev->dev, "remap_pfn_range failed\n");
 		return -EAGAIN;
 	}
 
@@ -341,9 +329,6 @@ static const struct file_operations pugs_fops = {
 	.mmap = axiom_mem_dev_mmap,
 };
 
-dma_addr_t dma_handle;
-void *buffer_addr;
-
 static int axiom_mem_dev_probe(struct platform_device *pdev)
 {
 	struct device_node *np = pdev->dev.of_node;
@@ -354,21 +339,21 @@ static int axiom_mem_dev_probe(struct platform_device *pdev)
 	dev_t devt;
 	struct mem_config *mem;
 
-	dev_info(dev, "%s M:%d m:%d   p=%p\n", __func__,
-		 MAJOR(dev->devt), MINOR(dev->devt), dev);
-
 	/* no device tree device */
 	if (!np) {
 		pr_err("%s] No device tree found\n", __func__);
 		return -ENODEV;
 	}
 
+	dev_dbg(dev, "%s M:%d m:%d   p=%p\n", __func__,
+		 MAJOR(dev->devt), MINOR(dev->devt), dev);
+
 	np = of_parse_phandle(dev->of_node, "memory-region", 0);
 	if (!np) {
 		dev_err(dev, "No memory-region specified\n");
 		return -EINVAL;
 	} else {
-		dev_info(dev, "of_node_full_name = %s\n", of_node_full_name(np));
+		dev_dbg(dev, "of_node_full_name = %s\n", of_node_full_name(np));
 	}
 
 	mem = mem_manager_find_by_name(of_node_full_name(np));
@@ -417,8 +402,6 @@ static int axiom_mem_dev_probe(struct platform_device *pdev)
 	platform_set_drvdata(pdev, (void *)&(axiom_mem_dev[ni]));
 
 	axiom_mem_dev[ni].memory = mem;
-pr_info("%s] memory: %p\n", __func__, &axiom_mem_dev[ni].memory);
-
 	++dev_num_instance;
 
 	mutex_unlock(&manager_mutex);
@@ -446,7 +429,6 @@ err1:
 
 static int axiom_mem_dev_remove(struct platform_device *pdev)
 {
-	struct device *dev = &pdev->dev;
 	struct axiom_mem_dev_struct *drvdata = platform_get_drvdata(pdev);
 
 	cdev_del(&drvdata->c_dev);
@@ -456,7 +438,6 @@ static int axiom_mem_dev_remove(struct platform_device *pdev)
 	--dev_num_instance;
 	mutex_unlock(&manager_mutex);
 
-	dev_info(dev, "bye\n");
 	return 0;
 }
 
