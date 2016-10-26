@@ -94,8 +94,9 @@ static int axiom_mem_dev_close(struct inode *i, struct file *f)
 	struct axiom_mem_dev_struct *dev = pdata->dev;
 
 	mem_free_space(dev->memory, pdata->axiom_app_id, 0, LONG_MAX);
+#ifdef DEBUG
 	mem_dump_list(dev->memory);
-
+#endif
 	kfree(pdata);
 
 	return 0;
