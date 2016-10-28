@@ -32,6 +32,9 @@ struct mem_config {
 	size_t size;
 	long v2p_offset;
 
+	unsigned long nic_base;
+	size_t nic_size;
+
 	struct res_mem virt_mem;
 
 	struct list_elem_s free_list;
@@ -203,7 +206,8 @@ static struct mem_config *_find_mem_by_name(const char *s)
 	return NULL;
 }
 
-struct mem_config *mem_manager_create(const char *s, struct resource *r)
+struct mem_config *mem_manager_create(const char *s, struct resource *app_res,
+				      struct resource *nic_res)
 {
 	int err = 0;
 	struct mem_config *memory;
@@ -221,8 +225,11 @@ struct mem_config *mem_manager_create(const char *s, struct resource *r)
 	if (memory == NULL)
 		goto out;
 
-	memory->base = (u64)r->start;
-	memory->size = resource_size(r);
+	memory->base = (u64)app_res->start;
+	memory->size = resource_size(app_res);
+
+	memory->nic_base = (u64)nic_res->start;
+	memory->nic_size = resource_size(nic_res);
 
 	memory->virt_mem.start = memory->virt_mem.end = 0;
 
@@ -259,6 +266,11 @@ out:
 	return memory;
 }
 
+unsigned long mem_virt_to_phys(struct mem_config *mem, unsigned long virt)
+{
+	return mem_v2p(mem, virt);
+}
+EXPORT_SYMBOL_GPL(mem_virt_to_phys);
 
 struct mem_config *mem_manager_find_by_name(const char *s)
 {
@@ -552,7 +564,7 @@ int mem_setup_user_vaddr(struct mem_config *mem,
 }
 EXPORT_SYMBOL_GPL(mem_setup_user_vaddr);
 
-int mem_get_phy_space(struct mem_config *mem, unsigned long *base, size_t *size)
+int mem_get_app_space(struct mem_config *mem, unsigned long *base, size_t *size)
 {
 	if (mem == NULL)
 		return -1;
@@ -566,7 +578,23 @@ int mem_get_phy_space(struct mem_config *mem, unsigned long *base, size_t *size)
 
 	return 0;
 }
-EXPORT_SYMBOL_GPL(mem_get_phy_space);
+EXPORT_SYMBOL_GPL(mem_get_app_space);
+
+int mem_get_nic_space(struct mem_config *mem, unsigned long *base, size_t *size)
+{
+	if (mem == NULL)
+		return -1;
+
+	mutex_lock(&(mem->mem_mutex));
+	if (base != NULL)
+		*base = mem->nic_base;
+	if (size != NULL)
+		*size = mem->nic_size;
+	mutex_unlock(&(mem->mem_mutex));
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(mem_get_nic_space);
 
 void mem_dump_list(struct mem_config *mem)
 {
@@ -585,7 +613,7 @@ EXPORT_SYMBOL_GPL(mem_dump_list);
 static int __init mem_manager_init(void)
 {
 	struct device_node *node;
-	struct resource r;
+	struct resource app_res, nic_res;
 	int ret;
 
 	node = of_find_node_by_path("/");
@@ -599,12 +627,21 @@ static int __init mem_manager_init(void)
 		if (node != NULL) {
 			pr_debug(">>> of_node_full_name = %s\n",
 				 of_node_full_name(node));
-			ret = of_address_to_resource(node, 0, &r);
-			if (!ret) {
-				mem_manager_create(of_node_full_name(node), &r);
-			} else {
+
+			ret = of_address_to_resource(node, 0, &app_res);
+			if (ret) {
 				pr_err("Invalid resource\n");
+				return -ENXIO;
 			}
+
+			ret = of_address_to_resource(node, 1, &nic_res);
+			if (ret) {
+				pr_err("Invalid resource\n");
+				return -ENXIO;
+			}
+
+			mem_manager_create(of_node_full_name(node), &app_res,
+			        &nic_res);
 		}
 	} while (node != NULL);
 

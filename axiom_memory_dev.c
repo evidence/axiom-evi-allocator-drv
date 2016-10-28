@@ -40,6 +40,7 @@
 
 #include "axiom_mem_manager.h"
 #include "axiom_mem_dev_user.h"
+#include "axiom_mem_dev.h"
 
 
 #define DRIVER_NAME     "axiom"
@@ -64,6 +65,8 @@ static struct axiom_mem_dev_struct {
 	struct device *dev; /* TODO: remove this field */
 	dev_t devt;
 	struct mem_config *memory;
+	unsigned long app_phys_base;
+	size_t app_phys_size;
 	struct axiom_mem_app mem_app[MAX_APP_ID + 1];
 } axiom_mem_dev[MAX_DEVICES_NUMBER];
 
@@ -73,6 +76,56 @@ struct fpriv_data_s {
 };
 
 #define TAG_APP_NONE (TAG_NONE)
+
+int axiom_mem_dev_get_appspace(unsigned long *base, size_t *size)
+{
+	struct axiom_mem_dev_struct *mem_dev = &axiom_mem_dev[DEFAULT_DEVICE];
+
+	if (mem_dev->memory == NULL)
+		return -EFAULT;
+
+	*base = mem_dev->app_phys_base;
+	*size = mem_dev->app_phys_size;
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(axiom_mem_dev_get_appspace);
+
+int axiom_mem_dev_get_nicspace(unsigned long *base, size_t *size)
+{
+	struct axiom_mem_dev_struct *mem_dev = &axiom_mem_dev[DEFAULT_DEVICE];
+
+	return mem_get_nic_space(mem_dev->memory, base, size);
+}
+EXPORT_SYMBOL_GPL(axiom_mem_dev_get_nicspace);
+
+int axiom_mem_dev_virt2off(int appid, unsigned long virt, size_t size,
+			   unsigned long *offset)
+{
+	struct axiom_mem_dev_struct *mem_dev = &axiom_mem_dev[DEFAULT_DEVICE];
+	struct axiom_mem_app *mem_app;
+	int i;
+
+	if (appid > MAX_APP_ID || mem_dev->mem_app[appid].used_regions == 0)
+		return -EFAULT;
+
+	mem_app = &mem_dev->mem_app[appid];
+	for (i = 0; i < mem_app->used_regions; i++) {
+		if ((virt >= mem_app->regions[i].base) &&
+		    (virt + size <
+		    mem_app->regions[i].base + mem_app->regions[i].size)) {
+			unsigned long phys = mem_virt_to_phys(mem_dev->memory,
+						(unsigned long)virt);
+
+			*offset = phys - mem_dev->app_phys_base;
+
+			return 0;
+		}
+	}
+
+	return -EFAULT;
+}
+EXPORT_SYMBOL_GPL(axiom_mem_dev_virt2off);
 
 static int axiom_mem_dev_open(struct inode *i, struct file *f)
 {
@@ -208,7 +261,7 @@ static long axiom_mem_dev_ioctl(struct file *f, unsigned int cmd,
 	case AXIOM_MEM_DEV_GET_MEM_INFO: {
 		struct axiom_mem_dev_info tmp;
 
-		err = mem_get_phy_space(dev->memory, &tmp.base, &tmp.size);
+		err = mem_get_app_space(dev->memory, &tmp.base, &tmp.size);
 		if (err)
 			return -EINVAL;
 
@@ -234,7 +287,6 @@ static long axiom_mem_dev_ioctl(struct file *f, unsigned int cmd,
 	}
 	case AXIOM_MEM_DEV_RESERVE_MEM: {
 		struct axiom_mem_dev_info tmp;
-		unsigned long offset;
 
 		err = copy_from_user(&tmp, (void __user *)arg, sizeof(tmp));
 		if (err)
@@ -335,7 +387,7 @@ static int axiom_mem_dev_mmap(struct file *file, struct vm_area_struct *vma)
 		  vma->vm_end);
 	dev_dbg(dev->dev, "pg_off = %lx\n", vma->vm_pgoff);
 
-	mem_get_phy_space(dev->memory, &mem_base, &mem_size);
+	mem_get_app_space(dev->memory, &mem_base, &mem_size);
 	if (size > mem_size) {
 		dev_err(dev->dev, "%zu > max size (%zu)\n", size, mem_size);
 		return -EAGAIN;
@@ -450,15 +502,13 @@ static int axiom_mem_dev_probe(struct platform_device *pdev)
 	axiom_mem_dev[ni].memory = mem;
 	++dev_num_instance;
 
-	mutex_unlock(&manager_mutex);
-	{
-		unsigned long mem_base;
-		size_t mem_size;
+	mem_get_app_space(axiom_mem_dev[ni].memory,
+			  &axiom_mem_dev[ni].app_phys_base,
+			  &axiom_mem_dev[ni].app_phys_size);
+	dev_info(dev, "dev%d base = 0x%lx size = %zu\n", ni,
+		 axiom_mem_dev[ni].app_phys_base, axiom_mem_dev[ni].app_phys_size);
 
-		mem_get_phy_space(axiom_mem_dev[ni].memory, &mem_base, &mem_size);
-		dev_info(dev, "dev%d base = 0x%lx size = %zu\n", ni,
-			 mem_base, mem_size);
-	}
+	mutex_unlock(&manager_mutex);
 
 	return 0;
 #if 0

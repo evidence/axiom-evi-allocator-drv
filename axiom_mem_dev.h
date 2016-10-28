@@ -1,0 +1,9 @@
+#ifndef AXIOM_MEM_DEV_H
+#define AXIOM_MEM_DEV_H
+
+int axiom_mem_dev_get_appspace(unsigned long *base, size_t *size);
+int axiom_mem_dev_get_nicspace(unsigned long *base, size_t *size);
+int axiom_mem_dev_virt2off(int appid, unsigned long virt, size_t size,
+        unsigned long *offset);
+
+#endif /* AXIOM_MEM_DEV_H */
