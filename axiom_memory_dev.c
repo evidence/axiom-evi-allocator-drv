@@ -51,12 +51,20 @@ static struct class *axiom_mem_dev_cl;  /* device class */
 static DEFINE_MUTEX(manager_mutex);
 static int dev_num_instance;
 
+#define MAX_APP_ID              255
+#define DEFAULT_DEVICE          0
+
+struct axiom_mem_app {
+	int used_regions;
+	struct axiom_mem_dev_info regions[AXIOM_MEM_APP_MAX_REG];
+};
 
 static struct axiom_mem_dev_struct {
 	struct cdev c_dev; /* character device structure */
 	struct device *dev; /* TODO: remove this field */
 	dev_t devt;
 	struct mem_config *memory;
+	struct axiom_mem_app mem_app[MAX_APP_ID + 1];
 } axiom_mem_dev[MAX_DEVICES_NUMBER];
 
 struct fpriv_data_s {
@@ -93,6 +101,9 @@ static int axiom_mem_dev_close(struct inode *i, struct file *f)
 	struct fpriv_data_s *pdata = f->private_data;
 	struct axiom_mem_dev_struct *dev = pdata->dev;
 
+        if (pdata->axiom_app_id != TAG_APP_NONE) {
+		dev->mem_app[pdata->axiom_app_id].used_regions = 0;
+        }
 	mem_free_space(dev->memory, pdata->axiom_app_id, 0, LONG_MAX);
 #ifdef DEBUG
 	mem_dump_list(dev->memory);
@@ -164,6 +175,25 @@ static int axiom_mem_dev_map_to_userspace(struct file *f,
 	return 0;
 }
 
+static int axiom_mem_dev_reserve_mem(struct file *f,
+				     struct axiom_mem_dev_info *info)
+{
+	struct fpriv_data_s *pdata = f->private_data;
+	struct axiom_mem_dev_struct *dev = pdata->dev;
+	unsigned long offset;
+	int err;
+
+	dev_dbg(dev->dev, "%s] allocate_space <%ld,%ld>(sz=%ld)\n",
+		__func__, info->base, info->base + info->size, info->size);
+
+	err = mem_allocate_space(dev->memory, pdata->axiom_app_id, info->base,
+		info->base + info->size, &offset);
+	if (err)
+		return err;
+
+	return axiom_mem_dev_map_to_userspace(f, info, offset);
+}
+
 static long axiom_mem_dev_ioctl(struct file *f, unsigned int cmd,
 				unsigned long arg)
 {
@@ -210,15 +240,10 @@ static long axiom_mem_dev_ioctl(struct file *f, unsigned int cmd,
 		if (err)
 			return -EFAULT;
 
-		dev_dbg(dev->dev, "%s] allocate_space <%ld,%ld>(sz=%ld)\n",
-			  __func__, tmp.base, tmp.base + tmp.size, tmp.size);
-		err = mem_allocate_space(dev->memory,
-					 pdata->axiom_app_id, tmp.base,
-					 tmp.base + tmp.size, &offset);
+		err = axiom_mem_dev_reserve_mem(f, &tmp);
 		if (err)
-			return err;
+			return -EFAULT;
 
-		err = axiom_mem_dev_map_to_userspace(f, &tmp, offset);
 #ifdef DEBUG
 		mem_dump_list(dev->memory);
 #endif
@@ -247,17 +272,37 @@ static long axiom_mem_dev_ioctl(struct file *f, unsigned int cmd,
 #endif
 		break;
 	}
-	case AXIOM_MEM_DEV_SET_APP_ID: {
-		int app_id;
+	case AXIOM_MEM_DEV_SET_APP: {
+		struct axiom_mem_dev_app tmp;
+		struct axiom_mem_app *mem_app;
+		int i;
 
-		err = copy_from_user(&app_id, (void __user *)arg, sizeof(app_id));
+		err = copy_from_user(&tmp, (void __user *)arg, sizeof(tmp));
 		if (err)
 			return -EFAULT;
 
-		if (pdata->axiom_app_id != TAG_APP_NONE)
+		if (pdata->axiom_app_id != TAG_APP_NONE ||
+			tmp.app_id > MAX_APP_ID)
 			return -EINVAL;
 
-		pdata->axiom_app_id = app_id;
+		pdata->axiom_app_id = tmp.app_id;
+
+		if (dev->mem_app[pdata->axiom_app_id].used_regions > 0 ||
+			tmp.used_regions > AXIOM_MEM_APP_MAX_REG)
+			return -EINVAL;
+
+		mem_app = &dev->mem_app[pdata->axiom_app_id];
+
+                for (i = 0; i < tmp.used_regions; i++) {
+			mem_app->regions[i] = tmp.info[i];
+			err = axiom_mem_dev_reserve_mem(f,
+				&mem_app->regions[i]);
+			if (err)
+				return -EFAULT;
+		}
+
+		mem_app->used_regions = tmp.used_regions;
+
 		dev_dbg(dev->dev, "Set app id: %d\n", pdata->axiom_app_id);
 
 		break;
