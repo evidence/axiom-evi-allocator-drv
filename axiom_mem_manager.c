@@ -518,7 +518,7 @@ static int _mem_setup_user_vaddr(struct mem_config *memory,
 	if (is_valid_res_mem(&(memory->virt_mem))) {
 		*base = memory->virt_mem.start;
 		*size = memory->virt_mem.end - memory->virt_mem.start;
-		pr_err("%s] already allocated b=0x%zx s=%zu\n", __func__,
+		pr_debug("%s] already allocated b=0x%zx s=%zu\n", __func__,
 		       *base, *size);
 
 		return 0;

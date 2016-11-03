@@ -106,8 +106,12 @@ int axiom_mem_dev_virt2off(int appid, unsigned long virt, size_t size,
 	struct axiom_mem_app *mem_app;
 	int i;
 
-	if (appid > MAX_APP_ID || mem_dev->mem_app[appid].used_regions == 0)
+	if (appid > MAX_APP_ID || mem_dev->mem_app[appid].used_regions == 0) {
+		dev_err(mem_dev->dev, "application not initialized - appid: %d "
+		        "used_regions: %d\n", appid,
+		        mem_dev->mem_app[appid].used_regions);
 		return -EFAULT;
+	}
 
 	mem_app = &mem_dev->mem_app[appid];
 	for (i = 0; i < mem_app->used_regions; i++) {
@@ -123,6 +127,8 @@ int axiom_mem_dev_virt2off(int appid, unsigned long virt, size_t size,
 		}
 	}
 
+	dev_err(mem_dev->dev, "mappping not found - appid: %d virt: %lu "
+	        "size: %lu \n", appid, virt, size);
 	return -EFAULT;
 }
 EXPORT_SYMBOL_GPL(axiom_mem_dev_virt2off);
