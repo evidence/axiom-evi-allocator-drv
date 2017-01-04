@@ -18,5 +18,5 @@ install: all
 	cp axiom_mem_dev_user.h $(DESTDIR)/usr/include/
 	cp axiom_mem_dev.h $(DESTDIR)/usr/include/linux/
 
-clean:
+clean distclean:
 	$(MAKE) -C $(KERNELDIR) M=$(PWD) clean
