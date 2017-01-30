@@ -1,7 +1,7 @@
 /*!
  * \file axiom_memory_dev.c
  *
- * \version     v0.10
+ * \version     v0.11
  * \date        2016-09-23
  *
  * Copyright (C) 2016, Evidence Srl.
@@ -615,3 +615,4 @@ module_exit(axiom_mem_dev_cleanup);
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Bruno Morelli <b.morelli@evidence.eu.com");
 MODULE_DESCRIPTION("Axiom Allocator Driver");
+MODULE_VERSION("v0.11");
