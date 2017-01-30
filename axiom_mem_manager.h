@@ -1,3 +1,12 @@
+/*!
+ * \file axiom_mem_manager.h
+ *
+ * \version     v0.10
+ * \date        2016-09-23
+ *
+ * Copyright (C) 2016, Evidence Srl.
+ * Terms of use are as specified in COPYING
+ */
 #ifndef AXIOM_MEM_MANAGER_H
 #define AXIOM_MEM_MANAGER_H
 

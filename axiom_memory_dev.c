@@ -1,3 +1,12 @@
+/*!
+ * \file axiom_memory_dev.c
+ *
+ * \version     v0.10
+ * \date        2016-09-23
+ *
+ * Copyright (C) 2016, Evidence Srl.
+ * Terms of use are as specified in COPYING
+ */
 #include <linux/module.h>    /* included for all kernel modules */
 #include <linux/version.h>
 #include <linux/kernel.h>    /* included for KERN_INFO */
