@@ -1,0 +1,26 @@
+Source: axiom-evi-allocator-drv
+Section: unknown
+Priority: optional
+Maintainer: Massimiliano <massy@unknown>
+Build-Depends: debhelper (>= 9)
+Standards-Version: 3.9.5
+Homepage: <insert the upstream URL, if relevant>
+Vcs-Git: git://anonscm.debian.org/collab-maint/axiom-apps.git
+
+Package: axiom-evi-allocator-system-map
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: Linux kernel system map 
+ Linux kernel system map
+
+Package: axiom-evi-allocator-modules
+Architecture: any
+Depends: axiom-evi-allocator-system-map, ${shlibs:Depends}, ${misc:Depends}
+Description: Evidence Logical Memory Driver for Axiom 
+ Evidence Logical Memory Driver for Axiom
+
+Package: axiom-evi-allocator-dev
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, libc-dev
+Description: Evidence Logical Memory Driver for Axiom - development files
+ Evidence Logical Memory Driver for Axiom

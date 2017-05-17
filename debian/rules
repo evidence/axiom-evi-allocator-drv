@@ -1,0 +1,122 @@
+#!/usr/bin/make -f
+
+DEBIAN_DIR := $(shell dirname $(realpath $(lastword $(MAKEFILE_LIST))))
+
+#DEB_TARGET_ARCH=arm64
+#DEB_TARGET_ARCH_BITS=64
+#DEB_TARGET_ARCH_CPU=arm64
+#DEB_TARGET_ARCH_ENDIAN=little
+#DEB_TARGET_ARCH_OS=linux
+#DEB_TARGET_GNU_CPU=aarch64
+#DEB_TARGET_GNU_SYSTEM=linux-gnu
+#DEB_TARGET_GNU_TYPE=aarch64-linux-gnu
+#DEB_TARGET_MULTIARCH=aarch64-linux-gnu
+
+.PHONY: build build-arch build-indep binary binary-arch binary-indep clean
+
+build: build-arch build-indep
+
+build-arch:
+	dh_testdir
+	make
+
+build-indep:
+
+binary: binary-arch binary-indep
+
+binary-arch: make-changelog
+	dh_testroot
+	dh_prep
+	dh_installdirs
+
+	$(MAKE) P=1 DESTDIR=$(DEBIAN_DIR)/tmp install
+	$(MAKE) -f debian/rules system-map
+
+	dh_install --list-missing
+	dh_installdocs
+	dh_installchangelogs
+	dh_installexamples
+	dh_installman
+	dh_installcatalogs
+	dh_installcron
+	dh_installdebconf
+	dh_installemacsen
+	dh_installifupdown
+	dh_installinfo
+	dh_installinit
+	dh_installmenu
+	dh_installmime
+	dh_installmodules
+	dh_installlogcheck
+	dh_installlogrotate
+	dh_installpam
+	dh_installppp
+	dh_installudev
+	dh_installwm
+	dh_installgsettings
+
+	dh_bugfiles
+	dh_ucf
+	dh_lintian
+	dh_gconf
+	dh_icons
+	dh_perl
+	dh_usrlocal
+
+	dh_link
+	dh_installxfonts
+	dh_compress
+	dh_fixperms
+
+#	dh_strip
+	PATH=$(LINARO)/host/usr/bin:$(PATH) dh_makeshlibs
+	dh_shlibdeps  --sysroot=$(ROOTFS)
+	dh_installdeb
+	dh_gencontrol
+	dh_md5sums
+	dh_builddeb
+
+binary-indep:
+
+clean: clean-changelog
+	dh_testdir
+	make P=1 clean
+	dh_clean
+
+#
+# changelog
+#
+
+KVERSION := $(shell cat $(AXIOMBSP)/build/linux/kernel/link-to-kernel-build/include/config/kernel.release)
+VERSION := $(shell git describe --tags --dirty | sed -e 's/^axiom-v//'  -e 's/-/+/' -e 's/-/~/g')
+BDATE := $(shell date -R)
+
+define changelog
+axiom-evi-allocator-drv ($(KVERSION)-$(VERSION)) unstable; urgency=low
+
+  * Dummy changelog.
+
+ -- Foo <foo@bar.com>  $(BDATE)
+endef
+export changelog
+
+.PHONY: make-changelog clean-changelog
+
+make-changelog:
+	echo "$$changelog" >$(DEBIAN_DIR)/changelog
+
+clean-changelog:
+	rm -f $(DEBIAN_DIR)/changelog
+
+#
+# Kernel system map (temp. hack)
+#
+
+KVERSION := $(shell cat $(AXIOMBSP)/build/linux/kernel/link-to-kernel-build/include/config/kernel.release)
+
+.PHONY: system-map
+
+system-map:
+	mkdir -p $(DEBIAN_DIR)/tmp/boot
+	cp $(AXIOMBSP)/build/linux/kernel/link-to-kernel-build/System.map \
+		$(DEBIAN_DIR)/tmp/boot/System.map-$(KVERSION)
