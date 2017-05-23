@@ -12,6 +12,17 @@ DEBIAN_DIR := $(shell dirname $(realpath $(lastword $(MAKEFILE_LIST))))
 #DEB_TARGET_GNU_TYPE=aarch64-linux-gnu
 #DEB_TARGET_MULTIARCH=aarch64-linux-gnu
 
+export P
+export E
+
+ifeq ($(P)$(E),10)
+KERNELDIR := $(AXIOMBSP)/build/linux/kernel/link-to-kernel-build
+else
+KERNELDIR := $(OUTPUT_DIR)/build/linux-custom
+endif
+
+KVERSION := $(shell cat $(KERNELDIR)/include/config/kernel.release)
+
 .PHONY: build build-arch build-indep binary binary-arch binary-indep clean
 
 build: build-arch build-indep
@@ -29,7 +40,7 @@ binary-arch: make-changelog
 	dh_prep
 	dh_installdirs
 
-	$(MAKE) P=1 DESTDIR=$(DEBIAN_DIR)/tmp install
+	$(MAKE) DESTDIR=$(DEBIAN_DIR)/tmp install
 	$(MAKE) -f debian/rules system-map
 
 	dh_install --list-missing
@@ -72,7 +83,17 @@ binary-arch: make-changelog
 	PATH=$(LINARO)/host/usr/bin:$(PATH) dh_makeshlibs
 	dh_shlibdeps  --sysroot=$(ROOTFS)
 	dh_installdeb
-	dh_gencontrol
+	echo "kversion=$(KVERSION)" \
+		>>$(DEBIAN_DIR)/axiom-evi-allocator-modules.substvars
+	dh_gencontrol -paxiom-evi-allocator-dev
+	dh_gencontrol -paxiom-evi-allocator-modules \
+		-- -DPackage=axiom-evi-allocator-modules-$(KVERSION)
+	mv $(DEBIAN_DIR)/axiom-evi-allocator-modules/usr/share/doc/axiom-evi-allocator-modules \
+		$(DEBIAN_DIR)/axiom-evi-allocator-modules/usr/share/doc/axiom-evi-allocator-modules-$(KVERSION)
+	dh_gencontrol -paxiom-evi-allocator-system-map \
+		-- -DPackage=axiom-evi-allocator-system-map-$(KVERSION)
+	mv $(DEBIAN_DIR)/axiom-evi-allocator-system-map/usr/share/doc/axiom-evi-allocator-system-map \
+		$(DEBIAN_DIR)/axiom-evi-allocator-system-map/usr/share/doc/axiom-evi-allocator-system-map-$(KVERSION)
 	dh_md5sums
 	dh_builddeb
 
@@ -87,12 +108,11 @@ clean: clean-changelog
 # changelog
 #
 
-KVERSION := $(shell cat $(AXIOMBSP)/build/linux/kernel/link-to-kernel-build/include/config/kernel.release)
 VERSION := $(shell git describe --tags --dirty | sed -e 's/^axiom-v//'  -e 's/-/+/' -e 's/-/~/g')
 BDATE := $(shell date -R)
 
 define changelog
-axiom-evi-allocator-drv ($(KVERSION)-$(VERSION)) unstable; urgency=low
+axiom-evi-allocator-drv ($(VERSION)) unstable; urgency=low
 
   * Dummy changelog.
 
@@ -111,8 +131,6 @@ clean-changelog:
 #
 # Kernel system map (temp. hack)
 #
-
-KVERSION := $(shell cat $(AXIOMBSP)/build/linux/kernel/link-to-kernel-build/include/config/kernel.release)
 
 .PHONY: system-map
 

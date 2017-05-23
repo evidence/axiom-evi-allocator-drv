@@ -15,7 +15,7 @@ Description: Linux kernel system map
 
 Package: axiom-evi-allocator-modules
 Architecture: any
-Depends: axiom-evi-allocator-system-map, ${shlibs:Depends}, ${misc:Depends}
+Depends: axiom-evi-allocator-system-map-${kversion}, ${shlibs:Depends}, ${misc:Depends}
 Description: Evidence Logical Memory Driver for Axiom 
  Evidence Logical Memory Driver for Axiom
 

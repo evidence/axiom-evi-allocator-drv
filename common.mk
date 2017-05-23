@@ -8,9 +8,16 @@ OUTPUT_DIR := ${BUILDROOT}/../output
 DESTDIR := $(realpath ${OUTPUT_DIR}/target)
 
 ifeq ($(P), 1)
+ifeq ($(E), 1)
+    CCPREFIX := ${OUTPUT_DIR}/host/usr/bin/$(CCARCH)-linux-
+    CROSS_COMPILE := ARCH=arm64 CROSS_COMPILE=$(CCPREFIX)
+    KERNELDIR := ${OUTPUT_DIR}/build/linux-custom
+    CC := $(OUTPUT_DIR)/host/usr/bin/aarch64-buildroot-linux-gnu-gcc
+else
     CROSS_COMPILE := ARCH=arm64 CROSS_COMPILE=$(PETALINUX)/tools/linux-i386/aarch64-linux-gnu/bin/aarch64-linux-gnu-
     KERNELDIR := $(AXIOMBSP)/build/linux/kernel/link-to-kernel-build
     CC := $(PETALINUX)/tools/linux-i386/aarch64-linux-gnu/bin/aarch64-linux-gnu-gcc
+endif
 else
 ifdef CCARCH
     KERNELDIR := ${OUTPUT_DIR}/build/linux-custom
