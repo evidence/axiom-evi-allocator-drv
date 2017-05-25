@@ -41,7 +41,6 @@ binary-arch: make-changelog
 	dh_installdirs
 
 	$(MAKE) DESTDIR=$(DEBIAN_DIR)/tmp install
-	$(MAKE) -f debian/rules system-map
 
 	dh_install --list-missing
 	dh_installdocs
@@ -90,10 +89,6 @@ binary-arch: make-changelog
 		-- -DPackage=axiom-evi-allocator-modules-$(KVERSION)
 	mv $(DEBIAN_DIR)/axiom-evi-allocator-modules/usr/share/doc/axiom-evi-allocator-modules \
 		$(DEBIAN_DIR)/axiom-evi-allocator-modules/usr/share/doc/axiom-evi-allocator-modules-$(KVERSION)
-	dh_gencontrol -paxiom-evi-allocator-system-map \
-		-- -DPackage=axiom-evi-allocator-system-map-$(KVERSION)
-	mv $(DEBIAN_DIR)/axiom-evi-allocator-system-map/usr/share/doc/axiom-evi-allocator-system-map \
-		$(DEBIAN_DIR)/axiom-evi-allocator-system-map/usr/share/doc/axiom-evi-allocator-system-map-$(KVERSION)
 	dh_md5sums
 	dh_builddeb
 
@@ -127,14 +122,3 @@ make-changelog:
 
 clean-changelog:
 	rm -f $(DEBIAN_DIR)/changelog
-
-#
-# Kernel system map (temp. hack)
-#
-
-.PHONY: system-map
-
-system-map:
-	mkdir -p $(DEBIAN_DIR)/tmp/boot
-	cp $(AXIOMBSP)/build/linux/kernel/link-to-kernel-build/System.map \
-		$(DEBIAN_DIR)/tmp/boot/System.map-$(KVERSION)

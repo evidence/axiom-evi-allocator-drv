@@ -7,15 +7,9 @@ Standards-Version: 3.9.5
 Homepage: <insert the upstream URL, if relevant>
 Vcs-Git: git://anonscm.debian.org/collab-maint/axiom-apps.git
 
-Package: axiom-evi-allocator-system-map
-Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}
-Description: Linux kernel system map 
- Linux kernel system map
-
 Package: axiom-evi-allocator-modules
 Architecture: any
-Depends: axiom-evi-allocator-system-map-${kversion}, ${shlibs:Depends}, ${misc:Depends}
+Depends: linux-modules-${kversion}, ${shlibs:Depends}, ${misc:Depends}
 Description: Evidence Logical Memory Driver for Axiom 
  Evidence Logical Memory Driver for Axiom
 
