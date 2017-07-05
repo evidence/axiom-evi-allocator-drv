@@ -9,6 +9,10 @@ obj-m += axiom_mem_manager.o
 axiom_mem_dev-objs := axiom_memory_dev.o
 obj-m += axiom_mem_dev.o
 
+ifeq ($(KERN),seco)
+CC:=$(PETALINUX)/tools/linux-i386/aarch64-linux-gnu/bin/aarch64-linux-gnu-gcc
+endif
+
 all:
 	$(MAKE) $(CROSS_COMPILE) -C $(KERNELDIR) M=$(PWD) modules
 
