@@ -222,7 +222,7 @@ static int axiom_mem_dev_map_to_userspace(struct file *f,
 
 	vma.vm_mm = mm;
 
-	vma.vm_page_prot = PROT_READ | PROT_WRITE;
+	pgprot_val(vma.vm_page_prot) = PROT_READ | PROT_WRITE;
 	/* vma.vm_page_prot = PROT_NONE; */
 	vma.vm_page_prot = pgprot_noncached(vma.vm_page_prot);
 
@@ -232,7 +232,7 @@ static int axiom_mem_dev_map_to_userspace(struct file *f,
 
 	dev_dbg(dev->dev, "Mapping vm_flags:%ld\n", vma.vm_flags);
 	vmaddr = vm_mmap(f, vma.vm_start, vma.vm_end - vma.vm_start,
-			 vma.vm_page_prot, vma.vm_flags, vma.vm_pgoff);
+			 pgprot_val(vma.vm_page_prot), vma.vm_flags, vma.vm_pgoff);
 	if (IS_ERR_VALUE(vmaddr)) {
 		dev_err(dev->dev, "Unable to vm_mmap\n");
 		return -1;
