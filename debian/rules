@@ -15,7 +15,7 @@ DEBIAN_DIR := $(shell dirname $(realpath $(lastword $(MAKEFILE_LIST))))
 export P
 export E
 
-ifeq ($(P)$(E),10)
+ifeq ($(KERN),seco)
 KERNELDIR := $(AXIOMBSP)/build/linux/kernel/link-to-kernel-build
 else
 KERNELDIR := $(OUTPUT_DIR)/build/linux-custom
