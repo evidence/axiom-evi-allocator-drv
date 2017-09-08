@@ -2,22 +2,27 @@
 
 DEBIAN_DIR := $(shell dirname $(realpath $(lastword $(MAKEFILE_LIST))))
 
-#DEB_TARGET_ARCH=arm64
-#DEB_TARGET_ARCH_BITS=64
-#DEB_TARGET_ARCH_CPU=arm64
-#DEB_TARGET_ARCH_ENDIAN=little
-#DEB_TARGET_ARCH_OS=linux
-#DEB_TARGET_GNU_CPU=aarch64
-#DEB_TARGET_GNU_SYSTEM=linux-gnu
-#DEB_TARGET_GNU_TYPE=aarch64-linux-gnu
-#DEB_TARGET_MULTIARCH=aarch64-linux-gnu
-
-export P
-export E
+export KERN
+export FS
 
 ifeq ($(KERN),seco)
+#
+# seco
+#
 KERNELDIR := $(AXIOMBSP)/build/linux/kernel/link-to-kernel-build
+else ifeq ($(KERN),x86)
+#
+# x86
+#
+ifdef _KVERSION
+KERNELDIR := /lib/modules/$(_KVERSION)/build
 else
+KERNELDIR := /lib/modules/$(shell uname -r)/build
+endif
+else
+#
+# other
+#
 KERNELDIR := $(OUTPUT_DIR)/build/linux-custom
 endif
 
@@ -35,7 +40,7 @@ build-indep:
 
 binary: binary-arch binary-indep
 
-binary-arch: make-changelog
+binary-arch: make-changelog init-control
 	dh_testroot
 	dh_prep
 	dh_installdirs
@@ -71,7 +76,7 @@ binary-arch: make-changelog
 	dh_gconf
 	dh_icons
 	dh_perl
-	dh_usrlocal
+#	dh_usrlocal
 
 	dh_link
 	dh_installxfonts
@@ -98,6 +103,17 @@ clean: clean-changelog
 	dh_testdir
 	make P=1 clean
 	dh_clean
+
+#
+# init-control
+#
+
+init-control:
+ifeq ($(FS),x86)
+	ln -fs $(DEBIAN_DIR)/control.x86 $(DEBIAN_DIR)/control
+else
+	ln -fs $(DEBIAN_DIR)/control.other $(DEBIAN_DIR)/control
+endif
 
 #
 # changelog

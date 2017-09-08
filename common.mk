@@ -18,8 +18,8 @@ ifeq ($(KERN),br)
     CC := $(OUTPUT_DIR)/host/usr/bin/aarch64-buildroot-linux-gnu-gcc
 else
 ifeq ($(KERN),x86)
-    ifeq ($(FS),x86)
-	    KERNELVER :=  $(shell uname -r)
+    ifdef _KVERSION
+	    KERNELVER :=  $(_KVERSION)
     else
 	    KERNELVER :=  $(shell uname -r)
     endif
