@@ -99,7 +99,7 @@ binary-arch: make-changelog init-control
 
 binary-indep:
 
-clean: clean-changelog
+clean: clean-changelog init-control
 	dh_testdir
 	make P=1 clean
 	dh_clean
