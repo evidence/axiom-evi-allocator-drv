@@ -2,15 +2,16 @@
 
 DEBIAN_DIR := $(shell dirname $(realpath $(lastword $(MAKEFILE_LIST))))
 
-export KERN
-export FS
+ifndef LINARO
+$(warning LINARO environment variable not found)
+endif
 
-ifeq ($(KERN),seco)
+ifeq ($(MODE),aarch64)
 #
 # seco
 #
 KERNELDIR := $(AXIOMBSP)/build/linux/kernel/link-to-kernel-build
-else ifeq ($(KERN),x86)
+else ifeq ($(MODE),x86)
 #
 # x86
 #
@@ -23,7 +24,7 @@ else
 #
 # other
 #
-KERNELDIR := $(OUTPUT_DIR)/build/linux-custom
+$(error Unknown MODE=$(MODE))
 endif
 
 KVERSION := $(shell cat $(KERNELDIR)/include/config/kernel.release)
@@ -101,7 +102,7 @@ binary-indep:
 
 clean: clean-changelog init-control
 	dh_testdir
-	make P=1 clean
+#	make P=1 clean
 	dh_clean
 
 #
