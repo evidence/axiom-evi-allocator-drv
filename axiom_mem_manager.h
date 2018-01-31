@@ -1,7 +1,7 @@
 /*!
  * \file axiom_mem_manager.h
  *
- * \version     v0.15
+ * \version     v1.0
  * \date        2016-09-23
  *
  * Copyright (C) 2016, Evidence Srl.
