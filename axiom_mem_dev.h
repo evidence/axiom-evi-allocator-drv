@@ -1,7 +1,7 @@
 /*!
  * \file axiom_mem_dev.h
  *
- * \version     v1.1
+ * \version     v1.2
  * \date        2016-09-23
  *
  * Copyright (C) 2016, Evidence Srl.
